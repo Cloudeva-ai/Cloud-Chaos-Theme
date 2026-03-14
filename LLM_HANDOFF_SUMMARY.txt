@@ -1,0 +1,82 @@
+Cloud Chaos App Summary
+
+Project path:
+S:\Avatar Video Bank\Cloud Eva Games\cloud_chaos_streamlit
+
+Overview
+- This is a mobile-first Streamlit game app with 4 screens:
+- register
+- game
+- results
+- leaderboard
+
+Main files
+- app.py
+- database.py
+- game_data.py
+- game_engine.py
+- .streamlit/config.toml
+
+Current UI/UX State
+- Brand colors are based on:
+- #023c57
+- #06c2ac
+- Overall palette was darkened from overly white to a blue-tinted light UI for better mobile readability.
+- Register screen uses centered Cloudeva logo with transparent asset:
+- Logo\CloudEva_Logo_transparent.png
+- Hero title is one line: CLOUD CHAOS
+- Prize pool uses local videos, looped, muted, autoplay, no controls.
+- Extra note below prize pool was removed.
+- Extra blank wrapper between prize pool and form was removed.
+- Question section was redesigned into modern card-like shells with:
+- question header
+- state chip
+- separate answer panels for owner and impact
+- Game flow now auto-advances sequentially from pain 1 to pain 5 using active_pain.
+- Question selection bug was fixed by:
+- using stable internal IDs in dropdowns
+- preventing reuse of already-selected owner/impact instead of stealing from previous answers
+- Leaderboard HTML rendering bug for pain accuracy bars was fixed.
+
+Current Functional State
+- Registration works.
+- Game timer no longer uses time.sleep(1) + st.rerun().
+- Timer is now JavaScript-driven in the browser and only returns to Streamlit on timeout.
+- Submit unlocks only when all 5 pain cards are fully completed.
+- Leaderboard stats and pain accuracy render properly.
+- App compiles successfully with:
+- python -m py_compile app.py database.py game_data.py
+
+Database / Backup State
+- SQLite DB file:
+- cloud_chaos.db
+- DB has improved robustness:
+- SQLite WAL
+- busy timeout
+- stronger validation
+- safer cache invalidation
+- Registration data backup is enabled in database.py
+- Current backups:
+- rolling Excel: player_registrations_backup.xlsx
+- rolling CSV: player_registrations_backup.csv
+- timestamped snapshots folder: registration_backups
+
+Video State
+- Streamlit static serving is enabled in .streamlit/config.toml
+- Banner videos currently point to:
+- /app/static/Laptop_3d.mp4
+- /app/static/SmartWatch_3d.mp4
+- Static files live in:
+- static
+- If videos fail again, next best fix is to replace the current st.markdown video embed with a dedicated components.html(...) block.
+
+Important Recent Decisions
+- UI-side duplicate email verification was removed because it was causing friction/issues.
+- DB still uses email as unique identity in upsert_player(), so same email updates existing player rather than creating a new one.
+- Sequential question flow was explicitly requested and implemented.
+- Mobile-first behavior is the main design priority.
+
+Best Next Step If Work Continues
+1. Fix the remaining mobile vertical gap on register screen.
+2. If needed, move prize videos to components.html(...) for maximum playback reliability.
+3. Final polish pass on typography, spacing, and premium feel across results/leaderboard.
