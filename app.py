@@ -1131,8 +1131,8 @@ def screen_register():
     """, unsafe_allow_html=True)
 
     # Get video sources
-    laptop_src = _get_video_source("Laptop_3d.mp4")
-    watch_src = _get_video_source("SmartWatch_3d.mp4")
+    laptop_src = _get_video_source("Laptop_3d_preview.mp4")
+    watch_src = _get_video_source("SmartWatch_3d_preview.mp4")
 
     # Video HTML - simple & reliable format
     laptop_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Laptop</div>"
