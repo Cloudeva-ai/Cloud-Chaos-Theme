@@ -1,6 +1,8 @@
-# Version 2.0 Video Code - Complete Prize Pool Implementation
+# Version 2.0 vs Version 1.0 Video Code Comparison
 
-## 1. Video Data URI Function
+## Version 2.0 Implementation (Better - Direct src)
+
+### 1. Video Data URI Function
 
 ```python
 @st.cache_data
@@ -11,19 +13,49 @@ def _video_data_uri(path: str) -> str:
     return f"data:video/{suffix};base64,{encoded}"
 ```
 
-## 2. Video Asset Selection Function
+### 2. Video HTML (Direct src attribute)
 
-```python
-def _static_asset_url(filename: str) -> str:
-    return f"/app/static/{filename}"
+```html
+<video src="{base64_data}" autoplay loop muted playsinline webkit-playsinline 
+       preload="metadata"
+       poster=""
+       onloadedmetadata="this.play().catch(() => {})"
+       oncanplay="this.play().catch(() => {})"
+       style="width:100%;height:140px;object-fit:cover;display:block;background:#fff">
+</video>
 ```
 
-## 3. Prize Pool Video Rendering (in screen_register function)
+---
+
+## Version 1.0 Implementation (Original - Source tags)
+
+### 1. Video Data URI Function
+
+```python
+def _video_data_uri(path: str, mime_type: str) -> str:
+    video_path = Path(path)
+    encoded = base64.b64encode(video_path.read_bytes()).decode("ascii")
+    return f"data:{mime_type};base64,{encoded}"
+```
+
+### 2. Video HTML (Using source tags)
+
+```html
+<video autoplay loop muted playsinline preload="auto" poster=""
+       onloadedmetadata="this.play().catch(() => {})"
+       style="width:100%;height:140px;object-fit:cover;display:block;background:#fff">
+  <source src="{base64_data}" type="video/mp4">
+</video>
+```
+
+---
+
+## Version 1.0 Complete Implementation
 
 ```python
 # Load video files
-laptop_video_mp4 = Path(__file__).parent / "static" / "Laptop_3d_preview.mp4"
-watch_video = Path(__file__).parent / "static" / "SmartWatch_3d_preview.mp4"
+laptop_video_mp4 = Path(__file__).parent / "static" / "Laptop_3d.mp4"
+watch_video = Path(__file__).parent / "static" / "SmartWatch_3d.mp4"
 
 # Default fallback HTML
 laptop_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Laptop</div>"
@@ -31,24 +63,24 @@ watch_video_html = "<div style='height:140px;display:flex;align-items:center;jus
 
 # Generate base64 encoded video HTML if file exists
 if laptop_video_mp4.exists():
-    laptop_src = _video_data_uri(laptop_video_mp4)
+    laptop_src = _video_data_uri(str(laptop_video_mp4), "video/mp4")
     laptop_video_html = f"""
-    <video src="{laptop_src}" autoplay loop muted playsinline webkit-playsinline preload="metadata"
+    <video autoplay loop muted playsinline preload="auto"
            poster=""
            onloadedmetadata="this.play().catch(() => {{}})"
-           oncanplay="this.play().catch(() => {{}})"
            style="width:100%;height:140px;object-fit:cover;display:block;background:#fff">
+      <source src="{laptop_src}" type="video/mp4">
     </video>
     """
 
 if watch_video.exists():
-    watch_src = _video_data_uri(watch_video)
+    watch_src = _video_data_uri(str(watch_video), "video/mp4")
     watch_video_html = f"""
-    <video src="{watch_src}" autoplay loop muted playsinline webkit-playsinline preload="metadata"
+    <video autoplay loop muted playsinline preload="auto"
            poster=""
            onloadedmetadata="this.play().catch(() => {{}})"
-           oncanplay="this.play().catch(() => {{}})"
            style="width:100%;height:140px;object-fit:cover;display:block;background:#fff">
+      <source src="{watch_src}" type="video/mp4">
     </video>
     """
 
@@ -72,37 +104,42 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 ```
 
-## Key Features of Version 2.0
+---
 
-✅ **Simple Function** - `_video_data_uri()` uses base64 encoding  
-✅ **Direct src attribute** - `<video src="{base64_data}">`  
-✅ **Event-based autoplay** - Uses `onloadedmetadata` and `oncanplay` handlers  
-✅ **Self-executing play** - `this.play().catch(() => {})`  
-✅ **No loops or complexity** - Direct Streamlit markdown rendering  
-✅ **Seamless playback** - Videos loop automatically  
-✅ **No player controls** - Clean, minimal UI  
+## Key Differences
 
-## Video Attributes Explained
+| Feature | Version 1.0 | Version 2.0 |
+|---------|------------|------------|
+| **Function signature** | `_video_data_uri(path, mime_type)` | `_video_data_uri(path)` |
+| **File detection** | Full filenames (`.mp4`) | Preview versions (`.mp4`) |
+| **Video tag src** | Uses `<source>` tags | Direct `src` attribute |
+| **Media type** | Passed as parameter | Auto-detected from suffix |
+| **Preload** | `preload="auto"` | `preload="metadata"` |
+| **Path handling** | `str(laptop_video_mp4)` | Direct Path object |
+| **Event handlers** | Single: `onloadedmetadata` | Dual: `onloadedmetadata` + `oncanplay` |
+| **webkit-playsinline** | Not included | Included for iOS |
 
-```html
-<video 
-  src="{base64_encoded_data}"  <!-- Direct embedding -->
-  autoplay                      <!-- Auto starts -->
-  loop                          <!-- Loops seamlessly -->
-  muted                         <!-- No audio -->
-  playsinline                   <!-- Mobile friendly -->
-  webkit-playsinline            <!-- iOS Safari -->
-  preload="metadata"            <!-- Load video metadata -->
-  poster=""                     <!-- No preview image -->
-  onloadedmetadata="this.play().catch(() => {})"  <!-- Play when ready -->
-  oncanplay="this.play().catch(() => {})"         <!-- Fallback play trigger -->
-  style="width:100%;height:140px;object-fit:cover;display:block;background:#fff">
-</video>
-```
+---
 
-## Why This Worked
+## Why Version 2.0 Was Better
 
-1. **Base64 encoding** - Videos embedded directly in HTML, no external requests
-2. **Event handlers** - Ensures playback starts immediately when browser is ready
-3. **Muted & loop** - Plays continuously without user interaction
-4. **Error handling** - `.catch(() => {})` silently ignores autoplay restrictions
+1. **Direct src attribute** - More reliable with base64 data
+2. **Dual event handlers** - Fallback if one event doesn't trigger
+3. **webkit-playsinline** - Better iOS Safari support
+4. **Auto-detect mime type** - Less error-prone
+5. **Preview versions** - Smaller file sizes for faster loading
+6. **metadata preload** - Faster playback start
+
+---
+
+## Why Videos Still Might Not Play on Streamlit Cloud
+
+**Version 1.0 & 2.0 Problem**: Both used base64 encoding which only works locally.
+
+**When deployed to Streamlit Cloud**:
+- Files don't exist in the runtime
+- Base64 encoding fails
+- No fallback to GitHub URLs
+- Videos don't play
+
+**Solution**: Use GitHub raw URLs as fallback (as implemented in current fix)
