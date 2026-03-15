@@ -1073,36 +1073,18 @@ def _image_data_uri(path: str) -> str:
     return f"data:image/{suffix};base64,{encoded}"
 
 
-def _video_source(filename: str) -> str:
-    """
-    Get video source URL.
-    - Local: tries base64 encoding if file exists
-    - Streamlit Cloud: uses GitHub raw URL
-    """
-    # Try local file first
-    static_dir = Path(__file__).parent / "static"
-    local_path = static_dir / filename
-    
-    if local_path.exists():
-        try:
-            suffix = local_path.suffix.lower().lstrip(".") or "mp4"
-            encoded = base64.b64encode(local_path.read_bytes()).decode("ascii")
-            return f"data:video/{suffix};base64,{encoded}"
-        except Exception:
-            pass
-    
-    # Fallback to GitHub raw URL
-    return f"https://raw.githubusercontent.com/Cloudeva-ai/Cloud-Chaos-Theme/main/static/{filename}"
+@st.cache_data
+def _video_bytes(path: str) -> bytes:
+    return Path(path).read_bytes()
 
 
-def _preferred_video_asset(primary_name: str, preview_name: str) -> str:
-    """Get video URL, preferring preview version."""
+def _preferred_video_asset(primary_name: str, preview_name: str) -> Path:
+    """Get local video path, preferring preview version."""
     static_dir = Path(__file__).parent / "static"
     preview_path = static_dir / preview_name
-    
-    # Use preview if it exists locally, otherwise use main
-    filename = preview_name if preview_path.exists() else primary_name
-    return _video_source(filename)
+    if preview_path.exists():
+        return preview_path
+    return static_dir / primary_name
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1149,46 +1131,61 @@ def screen_register():
     </div>
     """, unsafe_allow_html=True)
 
-    # Get video sources (works both locally and on Streamlit Cloud)
-    laptop_src = _preferred_video_asset("Laptop_3d.mp4", "Laptop_3d_preview.mp4")
-    watch_src = _preferred_video_asset("SmartWatch_3d.mp4", "SmartWatch_3d_preview.mp4")
+    laptop_video_mp4 = _preferred_video_asset("Laptop_3d.mp4", "Laptop_3d_preview.mp4")
+    watch_video_mp4 = _preferred_video_asset("SmartWatch_3d.mp4", "SmartWatch_3d_preview.mp4")
 
-    # Video HTML with sources
-    laptop_video_html = f"""
-    <video src="{laptop_src}" autoplay loop muted playsinline webkit-playsinline preload="metadata"
-           poster=""
-           onloadedmetadata="this.play().catch(() => {{}})"
-           oncanplay="this.play().catch(() => {{}})"
-           style="width:100%;height:140px;object-fit:cover;display:block;background:#fff">
-    </video>
-    """
+    st.markdown('<div class="prize-banner"><div class="prize-top-label">Prize Pool</div></div>', unsafe_allow_html=True)
+    col_a, col_b = st.columns(2, gap="small")
 
-    watch_video_html = f"""
-    <video src="{watch_src}" autoplay loop muted playsinline webkit-playsinline preload="metadata"
-           poster=""
-           onloadedmetadata="this.play().catch(() => {{}})"
-           oncanplay="this.play().catch(() => {{}})"
-           style="width:100%;height:140px;object-fit:cover;display:block;background:#fff">
-    </video>
-    """
+    with col_a:
+        if laptop_video_mp4.exists():
+            st.video(
+                _video_bytes(str(laptop_video_mp4)),
+                format="video/mp4",
+                autoplay=True,
+                loop=True,
+                muted=True,
+                width="stretch",
+            )
+        else:
+            st.markdown(
+                "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted);background:rgba(255,255,255,0.92);border-radius:12px 12px 0 0'>Laptop</div>",
+                unsafe_allow_html=True,
+            )
+        st.markdown(
+            """
+            <div style="margin-top:-6px;margin-bottom:6px;background:rgba(255,255,255,0.92);border:1px solid rgba(15,23,42,.08);border-radius:0 0 12px 12px;padding:10px 8px;text-align:center;">
+              <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#335369;padding-bottom:4px;">Laptop</div>
+              <div style="font-size:12px;font-weight:700;color:#00111f;">1 winner</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-    st.markdown(f"""
-    <div class="prize-banner">
-      <div class="prize-top-label">Prize Pool</div>
-      <div style="display:flex;gap:8px;margin-bottom:6px">
-        <div style="flex:1;background:rgba(255,255,255,0.92);border:1px solid rgba(15,23,42,.08);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;align-items:center;">
-          <div style="width:100%">{laptop_video_html}</div>
-          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#335369;padding:10px 0 4px;text-align:center">Laptop</div>
-          <div style="font-size:12px;font-weight:700;color:#00111f;padding-bottom:10px">1 winner</div>
-        </div>
-        <div style="flex:1;background:rgba(255,255,255,0.92);border:1px solid rgba(15,23,42,.08);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;align-items:center;">
-          <div style="width:100%">{watch_video_html}</div>
-          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#335369;padding:10px 0 4px;text-align:center">Smartwatch</div>
-          <div style="font-size:12px;font-weight:700;color:#00111f;padding-bottom:10px">3 winners</div>
-        </div>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
+    with col_b:
+        if watch_video_mp4.exists():
+            st.video(
+                _video_bytes(str(watch_video_mp4)),
+                format="video/mp4",
+                autoplay=True,
+                loop=True,
+                muted=True,
+                width="stretch",
+            )
+        else:
+            st.markdown(
+                "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted);background:rgba(255,255,255,0.92);border-radius:12px 12px 0 0'>Smartwatch</div>",
+                unsafe_allow_html=True,
+            )
+        st.markdown(
+            """
+            <div style="margin-top:-6px;margin-bottom:6px;background:rgba(255,255,255,0.92);border:1px solid rgba(15,23,42,.08);border-radius:0 0 12px 12px;padding:10px 8px;text-align:center;">
+              <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#335369;padding-bottom:4px;">Smartwatch</div>
+              <div style="font-size:12px;font-weight:700;color:#00111f;">3 winners</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     st.markdown("""
     <div class="form-shell">
