@@ -1074,7 +1074,9 @@ def _image_data_uri(path: str) -> str:
 
 
 def _static_asset_url(filename: str) -> str:
-    return f"/app/static/{filename}"
+    base_path = (st.get_option("server.baseUrlPath") or "").strip("/")
+    prefix = f"/{base_path}" if base_path else ""
+    return f"{prefix}/app/static/{filename}"
 
 
 def _preferred_video_asset(primary_name: str, preview_name: str) -> Path:
@@ -1132,56 +1134,91 @@ def screen_register():
     laptop_video_mp4 = _preferred_video_asset("Laptop_3d.mp4", "Laptop_3d_preview.mp4")
     watch_video = _preferred_video_asset("SmartWatch_3d.mp4", "SmartWatch_3d_preview.mp4")
 
-    st.markdown('<div class="prize-banner"><div class="prize-top-label">Prize Pool</div></div>', unsafe_allow_html=True)
-    left_col, right_col = st.columns(2, gap="small")
+    laptop_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Laptop</div>"
+    watch_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Watch</div>"
 
-    with left_col:
-        st.markdown(
-            """
-            <div style="height:8px;background:rgba(255,255,255,0.92);border:1px solid rgba(15,23,42,.08);border-bottom:none;border-radius:12px 12px 0 0;"></div>
-            """,
-            unsafe_allow_html=True,
-        )
-        if laptop_video_mp4.exists():
-            st.video(str(laptop_video_mp4), autoplay=True, loop=True, muted=True)
-        else:
-            st.markdown(
-                "<div style='height:140px;display:flex;align-items:center;justify-content:center;background:#fff;color:#5b7083;font-weight:700;'>Laptop</div>",
-                unsafe_allow_html=True,
-            )
-        st.markdown(
-            """
-            <div style="background:rgba(255,255,255,0.92);border:1px solid rgba(15,23,42,.08);border-top:none;border-radius:0 0 12px 12px;padding:10px 0 10px;text-align:center;">
-              <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#335369;padding-bottom:4px;">Laptop</div>
-              <div style="font-size:12px;font-weight:700;color:#00111f;">1 winner</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+    if laptop_video_mp4.exists():
+        laptop_src = _static_asset_url(laptop_video_mp4.name)
+        laptop_video_html = f"""
+        <video autoplay loop muted playsinline webkit-playsinline preload="none"
+               disablepictureinpicture disableremoteplayback
+               controlslist="nodownload noplaybackrate nofullscreen noremoteplayback"
+               tabindex="-1" aria-hidden="true"
+               style="width:100%;height:140px;object-fit:cover;display:block;background:#fff;pointer-events:none;">
+          <source src="{laptop_src}" type="video/mp4">
+        </video>
+        """
 
-    with right_col:
-        st.markdown(
-            """
-            <div style="height:8px;background:rgba(255,255,255,0.92);border:1px solid rgba(15,23,42,.08);border-bottom:none;border-radius:12px 12px 0 0;"></div>
-            """,
-            unsafe_allow_html=True,
-        )
-        if watch_video.exists():
-            st.video(str(watch_video), autoplay=True, loop=True, muted=True)
-        else:
-            st.markdown(
-                "<div style='height:140px;display:flex;align-items:center;justify-content:center;background:#fff;color:#5b7083;font-weight:700;'>Smartwatch</div>",
-                unsafe_allow_html=True,
-            )
-        st.markdown(
-            """
-            <div style="background:rgba(255,255,255,0.92);border:1px solid rgba(15,23,42,.08);border-top:none;border-radius:0 0 12px 12px;padding:10px 0 10px;text-align:center;">
-              <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#335369;padding-bottom:4px;">Smartwatch</div>
-              <div style="font-size:12px;font-weight:700;color:#00111f;">3 winners</div>
+    if watch_video.exists():
+        watch_src = _static_asset_url(watch_video.name)
+        watch_video_html = f"""
+        <video autoplay loop muted playsinline webkit-playsinline preload="none"
+               disablepictureinpicture disableremoteplayback
+               controlslist="nodownload noplaybackrate nofullscreen noremoteplayback"
+               tabindex="-1" aria-hidden="true"
+               style="width:100%;height:140px;object-fit:cover;display:block;background:#fff;pointer-events:none;">
+          <source src="{watch_src}" type="video/mp4">
+        </video>
+        """
+
+    st.html(
+        f"""
+        <div class="prize-banner">
+          <div class="prize-top-label">Prize Pool</div>
+          <div style="display:flex;gap:8px;margin-bottom:6px">
+            <div style="flex:1;background:rgba(255,255,255,0.92);border:1px solid rgba(15,23,42,.08);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;align-items:center;">
+              <div style="width:100%">{laptop_video_html}</div>
+              <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#335369;padding:10px 0 4px;text-align:center">Laptop</div>
+              <div style="font-size:12px;font-weight:700;color:#00111f;padding-bottom:10px">1 winner</div>
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
+            <div style="flex:1;background:rgba(255,255,255,0.92);border:1px solid rgba(15,23,42,.08);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;align-items:center;">
+              <div style="width:100%">{watch_video_html}</div>
+              <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#335369;padding:10px 0 4px;text-align:center">Smartwatch</div>
+              <div style="font-size:12px;font-weight:700;color:#00111f;padding-bottom:10px">3 winners</div>
+            </div>
+          </div>
+        </div>
+        <script>
+          (() => {{
+            const root = document.currentScript.parentElement;
+            const videos = root.querySelectorAll("video");
+            const tryPlay = (video) => {{
+              if (!video) return;
+              video.muted = true;
+              video.defaultMuted = true;
+              video.autoplay = true;
+              video.loop = true;
+              video.controls = false;
+              video.playsInline = true;
+              video.setAttribute("muted", "");
+              video.setAttribute("autoplay", "");
+              video.setAttribute("loop", "");
+              video.setAttribute("playsinline", "");
+              video.setAttribute("webkit-playsinline", "");
+              const attempt = () => {{
+                const promise = video.play();
+                if (promise && typeof promise.catch === "function") {{
+                  promise.catch(() => {{}});
+                }}
+              }};
+              video.addEventListener("loadedmetadata", attempt);
+              video.addEventListener("loadeddata", attempt);
+              video.addEventListener("canplay", attempt);
+              requestAnimationFrame(attempt);
+              setTimeout(attempt, 150);
+              setTimeout(attempt, 800);
+            }};
+            videos.forEach(tryPlay);
+            document.addEventListener("visibilitychange", () => {{
+              if (!document.hidden) {{
+                videos.forEach(tryPlay);
+              }}
+            }});
+          }})();
+        </script>
+        """,
+        unsafe_allow_javascript=True,
+    )
 
     st.markdown("""
     <div class="form-shell">
