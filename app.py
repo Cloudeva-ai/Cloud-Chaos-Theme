@@ -404,20 +404,10 @@ div[data-testid="stForm"] {
   border-radius: 12px;
   overflow: hidden;
   text-align: center;
-  width: 100%;
-}
-.prize-video-col {
-  min-width: 0;
-}
-.prize-video-col div[data-testid="stVerticalBlock"] {
-  gap: 0 !important;
 }
 .prize-video-card div[data-testid="stVideo"] {
   line-height: 0;
   margin: 0;
-}
-.prize-video-card div[data-testid="stVideo"] > div {
-  gap: 0 !important;
 }
 .prize-video-card div[data-testid="stVideo"] video {
   width: 100% !important;
@@ -427,21 +417,8 @@ div[data-testid="stForm"] {
   background: #000;
   border-radius: 0 !important;
   pointer-events: none;
-  box-shadow: none !important;
 }
 .prize-video-card div[data-testid="stVideo"] video::-webkit-media-controls {
-  display: none !important;
-}
-.prize-video-card div[data-testid="stVideo"] video::-webkit-media-controls-enclosure {
-  display: none !important;
-}
-.prize-video-card div[data-testid="stVideo"] video::-webkit-media-controls-panel {
-  display: none !important;
-}
-.prize-video-card div[data-testid="stVideo"] video::-webkit-media-controls-play-button {
-  display: none !important;
-}
-.prize-video-card div[data-testid="stVideo"] video::-webkit-media-controls-start-playback-button {
   display: none !important;
 }
 .prize-card-label {
@@ -1210,13 +1187,9 @@ def screen_register():
     """, unsafe_allow_html=True)
     col_laptop, col_watch = st.columns(2, gap="small")
     with col_laptop:
-        st.markdown('<div class="prize-video-col">', unsafe_allow_html=True)
         _render_prize_video_card("Laptop_3d.mp4", "Laptop", "1 winner")
-        st.markdown('</div>', unsafe_allow_html=True)
     with col_watch:
-        st.markdown('<div class="prize-video-col">', unsafe_allow_html=True)
         _render_prize_video_card("SmartWatch_3d.mp4", "Smartwatch", "3 winners")
-        st.markdown('</div>', unsafe_allow_html=True)
     components.html(
         """
         <script>
@@ -1230,18 +1203,10 @@ def screen_register():
             video.autoplay = true;
             video.loop = true;
             video.playsInline = true;
-            video.setAttribute('webkit-playsinline', '');
-            video.setAttribute('disablepictureinpicture', '');
-            video.setAttribute('disableremoteplayback', '');
-            video.setAttribute('controlslist', 'nodownload nofullscreen noremoteplayback');
             video.setAttribute('muted', '');
             video.setAttribute('autoplay', '');
             video.setAttribute('loop', '');
             video.setAttribute('playsinline', '');
-            const playPromise = video.play?.();
-            if (playPromise && typeof playPromise.catch === 'function') {
-              playPromise.catch(() => {});
-            }
           });
         };
         syncPrizeVideos();
