@@ -1073,21 +1073,37 @@ def _image_data_uri(path: str) -> str:
     return f"data:image/{suffix};base64,{encoded}"
 
 
-@st.cache_data
-def _video_data_uri(path: str) -> str:
-    video_path = Path(path)
-    suffix = video_path.suffix.lower().lstrip(".") or "mp4"
-    encoded = base64.b64encode(video_path.read_bytes()).decode("ascii")
-    return f"data:video/{suffix};base64,{encoded}"
+def _get_video_source(filename: str) -> str:
+    """
+    Get video source URL - works both locally and on Streamlit Cloud.
+    - Locally: Returns base64 encoded video if file exists
+    - Streamlit Cloud: Returns GitHub raw URL
+    """
+    # Try local file first
+    static_dir = Path(__file__).parent / "static"
+    local_path = static_dir / filename
+    
+    if local_path.exists():
+        try:
+            # Use base64 locally for best performance
+            suffix = local_path.suffix.lower().lstrip(".") or "mp4"
+            encoded = base64.b64encode(local_path.read_bytes()).decode("ascii")
+            return f"data:video/{suffix};base64,{encoded}"
+        except Exception:
+            pass
+    
+    # Fallback to GitHub raw URL (works on Streamlit Cloud)
+    return f"https://raw.githubusercontent.com/Cloudeva-ai/Cloud-Chaos-Theme/main/static/{filename}"
 
 
-def _preferred_video_asset(primary_name: str, preview_name: str) -> Path:
-    """Get local video path, preferring preview version."""
+def _preferred_video_asset(primary_name: str, preview_name: str) -> str:
+    """Get video source URL, preferring preview version if available locally."""
     static_dir = Path(__file__).parent / "static"
     preview_path = static_dir / preview_name
-    if preview_path.exists():
-        return preview_path
-    return static_dir / primary_name
+    
+    # Use preview if it exists locally, otherwise use main
+    filename = preview_name if preview_path.exists() else primary_name
+    return _get_video_source(filename)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1140,8 +1156,9 @@ def screen_register():
     laptop_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Laptop</div>"
     watch_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Watch</div>"
 
+    # Get video sources (works both locally AND on Streamlit Cloud)
     if laptop_video_mp4.exists():
-        laptop_src = _video_data_uri(str(laptop_video_mp4))
+        laptop_src = _get_video_source("Laptop_3d_preview.mp4")
         laptop_video_html = f"""
         <video src="{laptop_src}" autoplay loop muted playsinline webkit-playsinline preload="metadata"
                poster=""
@@ -1150,11 +1167,33 @@ def screen_register():
                style="width:100%;height:140px;object-fit:cover;display:block;background:#fff">
         </video>
         """
+    else:
+        # Try GitHub URL even if local file doesn't exist
+        github_src = _get_video_source("Laptop_3d_preview.mp4")
+        laptop_video_html = f"""
+        <video src="{github_src}" autoplay loop muted playsinline webkit-playsinline preload="metadata"
+               poster=""
+               onloadedmetadata="this.play().catch(() => {{}})"
+               oncanplay="this.play().catch(() => {{}})"
+               style="width:100%;height:140px;object-fit:cover;display:block;background:#fff">
+        </video>
+        """
 
     if watch_video.exists():
-        watch_src = _video_data_uri(str(watch_video))
+        watch_src = _get_video_source("SmartWatch_3d_preview.mp4")
         watch_video_html = f"""
         <video src="{watch_src}" autoplay loop muted playsinline webkit-playsinline preload="metadata"
+               poster=""
+               onloadedmetadata="this.play().catch(() => {{}})"
+               oncanplay="this.play().catch(() => {{}})"
+               style="width:100%;height:140px;object-fit:cover;display:block;background:#fff">
+        </video>
+        """
+    else:
+        # Try GitHub URL even if local file doesn't exist
+        github_src = _get_video_source("SmartWatch_3d_preview.mp4")
+        watch_video_html = f"""
+        <video src="{github_src}" autoplay loop muted playsinline webkit-playsinline preload="metadata"
                poster=""
                onloadedmetadata="this.play().catch(() => {{}})"
                oncanplay="this.play().catch(() => {{}})"
