@@ -1073,44 +1073,50 @@ def _image_data_uri(path: str) -> str:
     return f"data:image/{suffix};base64,{encoded}"
 
 
-@st.cache_data
-def _video_data_uri(path: str, mime_type: str) -> tuple[str | None, bool]:
+def _get_video_url(filename: str, use_preview: bool = False) -> str:
     """
-    Load video file as base64 data URI.
-    Returns (data_uri, success) tuple. If file missing, returns (None, False).
+    Get video URL (GitHub raw or local).
+    Detects deployment environment:
+    - Local: Returns file path as string (will try to load from static/)
+    - Streamlit Cloud: Returns GitHub raw URL
     """
-    try:
-        video_path = Path(path)
-        if not video_path.exists():
-            return None, False
-        encoded = base64.b64encode(video_path.read_bytes()).decode("ascii")
-        return f"data:{mime_type};base64,{encoded}", True
-    except Exception:
-        return None, False
-
-
-def _preferred_video_asset(primary_name: str, preview_name: str) -> Path:
-    """
-    Get video asset path, preferring preview version if available.
-    Works with both 'static/' and 'Videos/' directories.
-    """
-    app_root = Path(__file__).parent
+    # GitHub repo info
+    github_org = "Cloudeva-ai"
+    github_repo = "Cloud-Chaos-Theme"
+    github_branch = "main"
     
-    # Try static/ directory first
-    static_dir = app_root / "static"
+    # Check if running on Streamlit Cloud (cloud.streamlit.app)
+    is_cloud = "streamlit.app" in st.config.get_option("client.serverAddress")
+    
+    if is_cloud:
+        # Use GitHub raw URL for cloud deployment
+        return f"https://raw.githubusercontent.com/{github_org}/{github_repo}/{github_branch}/static/{filename}"
+    else:
+        # Local: return file path (actual file loading happens in HTML)
+        static_dir = Path(__file__).parent / "static"
+        video_path = static_dir / filename
+        if video_path.exists():
+            # Try local base64 encoding
+            try:
+                encoded = base64.b64encode(video_path.read_bytes()).decode("ascii")
+                return f"data:video/mp4;base64,{encoded}"
+            except Exception:
+                pass
+        # Fallback to GitHub URL
+        return f"https://raw.githubusercontent.com/{github_org}/{github_repo}/{github_branch}/static/{filename}"
+
+
+def _preferred_video_asset(primary_name: str, preview_name: str) -> str:
+    """
+    Get video URL, preferring preview version if available locally.
+    Returns the HTML video source URL (GitHub raw or local).
+    """
+    static_dir = Path(__file__).parent / "static"
     preview_path = static_dir / preview_name
-    if preview_path.exists():
-        return preview_path
-    main_path = static_dir / primary_name
-    if main_path.exists():
-        return main_path
     
-    # Fallback to Videos/ directory
-    videos_dir = app_root / "Videos"
-    preview_path = videos_dir / preview_name
-    if preview_path.exists():
-        return preview_path
-    return videos_dir / primary_name
+    # Use preview if it exists locally, otherwise use main
+    filename = preview_name if preview_path.exists() else primary_name
+    return _get_video_url(filename)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1157,31 +1163,30 @@ def screen_register():
     </div>
     """, unsafe_allow_html=True)
 
-    laptop_video_mp4 = _preferred_video_asset("Laptop_3d.mp4", "Laptop_3d_preview.mp4")
-    watch_video = _preferred_video_asset("SmartWatch_3d.mp4", "SmartWatch_3d_preview.mp4")
+    laptop_video_url = _preferred_video_asset("Laptop_3d.mp4", "Laptop_3d_preview.mp4")
+    watch_video_url = _preferred_video_asset("SmartWatch_3d.mp4", "SmartWatch_3d_preview.mp4")
 
-    laptop_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Laptop</div>"
-    watch_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Watch</div>"
+    # Default fallback HTML (shown if videos can't load)
+    laptop_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted);background:#f5f5f5;'>Laptop</div>"
+    watch_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted);background:#f5f5f5;'>Watch</div>"
 
-    # Laptop video
-    laptop_src, laptop_loaded = _video_data_uri(str(laptop_video_mp4), "video/mp4")
-    if laptop_loaded and laptop_src:
+    # Laptop video HTML
+    if laptop_video_url:
         laptop_video_html = f"""
         <video autoplay loop muted playsinline webkit-playsinline preload="metadata"
                disablepictureinpicture disableremoteplayback
                style="width:100%;height:140px;object-fit:cover;display:block;background:#fff;pointer-events:none;">
-          <source src="{laptop_src}" type="video/mp4">
+          <source src="{laptop_video_url}" type="video/mp4">
         </video>
         """
 
-    # Smartwatch video
-    watch_src, watch_loaded = _video_data_uri(str(watch_video), "video/mp4")
-    if watch_loaded and watch_src:
+    # Smartwatch video HTML
+    if watch_video_url:
         watch_video_html = f"""
         <video autoplay loop muted playsinline webkit-playsinline preload="metadata"
                disablepictureinpicture disableremoteplayback
                style="width:100%;height:140px;object-fit:cover;display:block;background:#fff;pointer-events:none;">
-          <source src="{watch_src}" type="video/mp4">
+          <source src="{watch_video_url}" type="video/mp4">
         </video>
         """
 
