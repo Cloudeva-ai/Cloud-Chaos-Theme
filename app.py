@@ -1073,6 +1073,14 @@ def _image_data_uri(path: str) -> str:
     return f"data:image/{suffix};base64,{encoded}"
 
 
+@st.cache_data
+def _video_data_uri(path: str) -> str:
+    video_path = Path(path)
+    suffix = video_path.suffix.lower().lstrip(".") or "mp4"
+    encoded = base64.b64encode(video_path.read_bytes()).decode("ascii")
+    return f"data:video/{suffix};base64,{encoded}"
+
+
 def _static_asset_url(filename: str) -> str:
     return f"/app/static/{filename}"
 
@@ -1121,13 +1129,13 @@ def screen_register():
     </div>
     """, unsafe_allow_html=True)
 
-    laptop_video_mp4 = Path(__file__).parent / "static" / "Laptop_3d.mp4"
-    watch_video = Path(__file__).parent / "static" / "SmartWatch_3d.mp4"
+    laptop_video_mp4 = Path(__file__).parent / "static" / "Laptop_3d_preview.mp4"
+    watch_video = Path(__file__).parent / "static" / "SmartWatch_3d_preview.mp4"
     laptop_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Laptop</div>"
     watch_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Watch</div>"
 
     if laptop_video_mp4.exists():
-        laptop_src = _static_asset_url(laptop_video_mp4.name)
+        laptop_src = _video_data_uri(laptop_video_mp4)
         laptop_video_html = f"""
         <video src="{laptop_src}" autoplay loop muted playsinline webkit-playsinline preload="metadata"
                poster=""
@@ -1138,7 +1146,7 @@ def screen_register():
         """
 
     if watch_video.exists():
-        watch_src = _static_asset_url(watch_video.name)
+        watch_src = _video_data_uri(watch_video)
         watch_video_html = f"""
         <video src="{watch_src}" autoplay loop muted playsinline webkit-playsinline preload="metadata"
                poster=""
