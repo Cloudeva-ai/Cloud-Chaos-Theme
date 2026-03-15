@@ -398,6 +398,46 @@ div[data-testid="stForm"] {
 }
 .prize-top-label { font-size: 11px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: #77c4a5; margin-bottom: 12px; }
 .prize-items { display: flex; justify-content: center; gap: 10px; margin-bottom: 10px; flex-wrap: nowrap; }
+.prize-video-grid { margin-bottom: 6px; }
+.prize-video-card {
+  background: rgba(255,255,255,0.92);
+  border: 1px solid rgba(15,23,42,.08);
+  border-radius: 12px;
+  overflow: hidden;
+  text-align: center;
+}
+.prize-video-card [data-testid="stVideo"] {
+  width: 100% !important;
+  display: block;
+  background: #000;
+  margin: 0;
+}
+.prize-video-card video[data-testid="stVideo"] {
+  width: 100% !important;
+  height: 140px !important;
+  object-fit: cover;
+  display: block;
+  background: #000;
+  border-radius: 0 !important;
+}
+.prize-video-card video[data-testid="stVideo"]::-webkit-media-controls {
+  display: none !important;
+}
+.prize-card-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #335369;
+  padding: 10px 0 4px;
+  text-align: center;
+}
+.prize-card-winners {
+  font-size: 12px;
+  font-weight: 700;
+  color: #00111f;
+  padding-bottom: 10px;
+}
 .prize-item {
   flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
   background: rgba(255,255,255,0.70); border: 1px solid rgba(6,194,172,0.16);
@@ -1073,17 +1113,29 @@ def _image_data_uri(path: str) -> str:
     return f"data:image/{suffix};base64,{encoded}"
 
 
-@st.cache_data(show_spinner=False)
-def _get_video_source(filename: str) -> str:
-    """
-    Get video source from the main files in Videos/ as a data URI.
-    """
+def _get_video_path(filename: str) -> Path | None:
     video_path = Path(__file__).parent / "Videos" / filename
-    if not video_path.exists():
-        return ""
-    suffix = video_path.suffix.lower().lstrip(".") or "mp4"
-    encoded = base64.b64encode(video_path.read_bytes()).decode("ascii")
-    return f"data:video/{suffix};base64,{encoded}"
+    return video_path if video_path.exists() else None
+
+
+def _render_prize_video_card(filename: str, label: str, winners: str) -> None:
+    st.markdown('<div class="prize-video-card">', unsafe_allow_html=True)
+    video_path = _get_video_path(filename)
+    if video_path is None:
+        st.markdown(
+            f"<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>{label}</div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.video(str(video_path), autoplay=True, muted=True, loop=True)
+    st.markdown(
+        f"""
+        <div class="prize-card-label">{label}</div>
+        <div class="prize-card-winners">{winners}</div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1130,35 +1182,16 @@ def screen_register():
     </div>
     """, unsafe_allow_html=True)
 
-    # Get video sources
-    laptop_src = _get_video_source("Laptop_3d_preview.mp4")
-    watch_src = _get_video_source("SmartWatch_3d_preview.mp4")
-
-    # Video HTML - simple & reliable format
-    laptop_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Laptop</div>"
-    watch_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Smartwatch</div>"
-    if laptop_src:
-        laptop_video_html = f"""<video autoplay loop muted playsinline preload="metadata" style="width:100%;height:140px;object-fit:cover;display:block;background:#000;" crossorigin="anonymous"><source src="{laptop_src}" type="video/mp4"></video>"""
-    if watch_src:
-        watch_video_html = f"""<video autoplay loop muted playsinline preload="metadata" style="width:100%;height:140px;object-fit:cover;display:block;background:#000;" crossorigin="anonymous"><source src="{watch_src}" type="video/mp4"></video>"""
-
-    st.markdown(f"""
+    st.markdown("""
     <div class="prize-banner">
       <div class="prize-top-label">Prize Pool</div>
-      <div style="display:flex;gap:8px;margin-bottom:6px">
-        <div style="flex:1;background:rgba(255,255,255,0.92);border:1px solid rgba(15,23,42,.08);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;align-items:center;">
-          <div style="width:100%">{laptop_video_html}</div>
-          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#335369;padding:10px 0 4px;text-align:center">Laptop</div>
-          <div style="font-size:12px;font-weight:700;color:#00111f;padding-bottom:10px">1 winner</div>
-        </div>
-        <div style="flex:1;background:rgba(255,255,255,0.92);border:1px solid rgba(15,23,42,.08);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;align-items:center;">
-          <div style="width:100%">{watch_video_html}</div>
-          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#335369;padding:10px 0 4px;text-align:center">Smartwatch</div>
-          <div style="font-size:12px;font-weight:700;color:#00111f;padding-bottom:10px">3 winners</div>
-        </div>
-      </div>
     </div>
     """, unsafe_allow_html=True)
+    col_laptop, col_watch = st.columns(2, gap="small")
+    with col_laptop:
+        _render_prize_video_card("Laptop_3d.mp4", "Laptop", "1 winner")
+    with col_watch:
+        _render_prize_video_card("SmartWatch_3d.mp4", "Smartwatch", "3 winners")
 
     st.markdown("""
     <div class="form-shell">
