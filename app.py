@@ -1073,50 +1073,20 @@ def _image_data_uri(path: str) -> str:
     return f"data:image/{suffix};base64,{encoded}"
 
 
-def _get_video_url(filename: str, use_preview: bool = False) -> str:
-    """
-    Get video URL (GitHub raw or local).
-    Detects deployment environment:
-    - Local: Returns file path as string (will try to load from static/)
-    - Streamlit Cloud: Returns GitHub raw URL
-    """
-    # GitHub repo info
-    github_org = "Cloudeva-ai"
-    github_repo = "Cloud-Chaos-Theme"
-    github_branch = "main"
-    
-    # Check if running on Streamlit Cloud (cloud.streamlit.app)
-    is_cloud = "streamlit.app" in st.config.get_option("client.serverAddress")
-    
-    if is_cloud:
-        # Use GitHub raw URL for cloud deployment
-        return f"https://raw.githubusercontent.com/{github_org}/{github_repo}/{github_branch}/static/{filename}"
-    else:
-        # Local: return file path (actual file loading happens in HTML)
-        static_dir = Path(__file__).parent / "static"
-        video_path = static_dir / filename
-        if video_path.exists():
-            # Try local base64 encoding
-            try:
-                encoded = base64.b64encode(video_path.read_bytes()).decode("ascii")
-                return f"data:video/mp4;base64,{encoded}"
-            except Exception:
-                pass
-        # Fallback to GitHub URL
-        return f"https://raw.githubusercontent.com/{github_org}/{github_repo}/{github_branch}/static/{filename}"
+@st.cache_data
+def _video_data_uri(path: str) -> str:
+    video_path = Path(path)
+    suffix = video_path.suffix.lower().lstrip(".") or "mp4"
+    encoded = base64.b64encode(video_path.read_bytes()).decode("ascii")
+    return f"data:video/{suffix};base64,{encoded}"
 
 
-def _preferred_video_asset(primary_name: str, preview_name: str) -> str:
-    """
-    Get video URL, preferring preview version if available locally.
-    Returns the HTML video source URL (GitHub raw or local).
-    """
+def _preferred_video_asset(primary_name: str, preview_name: str) -> Path:
     static_dir = Path(__file__).parent / "static"
     preview_path = static_dir / preview_name
-    
-    # Use preview if it exists locally, otherwise use main
-    filename = preview_name if preview_path.exists() else primary_name
-    return _get_video_url(filename)
+    if preview_path.exists():
+        return preview_path
+    return static_dir / primary_name
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1163,171 +1133,51 @@ def screen_register():
     </div>
     """, unsafe_allow_html=True)
 
-    laptop_video_url = _preferred_video_asset("Laptop_3d.mp4", "Laptop_3d_preview.mp4")
-    watch_video_url = _preferred_video_asset("SmartWatch_3d.mp4", "SmartWatch_3d_preview.mp4")
+    laptop_video_mp4 = Path(__file__).parent / "static" / "Laptop_3d_preview.mp4"
+    watch_video = Path(__file__).parent / "static" / "SmartWatch_3d_preview.mp4"
 
-    # Default fallback HTML (shown if videos can't load)
-    laptop_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted);background:#f5f5f5;'>Laptop</div>"
-    watch_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted);background:#f5f5f5;'>Watch</div>"
+    laptop_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Laptop</div>"
+    watch_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Watch</div>"
 
-    # Laptop video HTML
-    if laptop_video_url:
+    if laptop_video_mp4.exists():
+        laptop_src = _video_data_uri(laptop_video_mp4)
         laptop_video_html = f"""
-        <video autoplay loop muted playsinline webkit-playsinline preload="metadata"
-               disablepictureinpicture disableremoteplayback
-               style="width:100%;height:140px;object-fit:cover;display:block;background:#fff;pointer-events:none;">
-          <source src="{laptop_video_url}" type="video/mp4">
+        <video src="{laptop_src}" autoplay loop muted playsinline webkit-playsinline preload="metadata"
+               poster=""
+               onloadedmetadata="this.play().catch(() => {{}})"
+               oncanplay="this.play().catch(() => {{}})"
+               style="width:100%;height:140px;object-fit:cover;display:block;background:#fff">
         </video>
         """
 
-    # Smartwatch video HTML
-    if watch_video_url:
+    if watch_video.exists():
+        watch_src = _video_data_uri(watch_video)
         watch_video_html = f"""
-        <video autoplay loop muted playsinline webkit-playsinline preload="metadata"
-               disablepictureinpicture disableremoteplayback
-               style="width:100%;height:140px;object-fit:cover;display:block;background:#fff;pointer-events:none;">
-          <source src="{watch_video_url}" type="video/mp4">
+        <video src="{watch_src}" autoplay loop muted playsinline webkit-playsinline preload="metadata"
+               poster=""
+               onloadedmetadata="this.play().catch(() => {{}})"
+               oncanplay="this.play().catch(() => {{}})"
+               style="width:100%;height:140px;object-fit:cover;display:block;background:#fff">
         </video>
         """
 
-    components.html(
-        f"""
-        <style>
-          body {{
-            margin: 0;
-            background: transparent;
-            font-family: 'Manrope', sans-serif;
-          }}
-          .prize-banner {{
-            border-radius: 22px;
-            padding: 18px;
-            background:
-              linear-gradient(180deg, rgba(255,255,255,0.16), rgba(3,94,137,0.22)),
-              radial-gradient(circle at 12% 18%, rgba(236,250,247,0.18), transparent 22%),
-              radial-gradient(circle at 86% 26%, rgba(6,194,172,0.18), transparent 24%);
-            border: 1px solid rgba(255,255,255,0.22);
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 24px 48px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.22);
-            backdrop-filter: blur(20px) saturate(145%);
-            -webkit-backdrop-filter: blur(20px) saturate(145%);
-          }}
-          .prize-banner::after {{
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,.4) 50%, transparent 70%);
-            background-size: 200% auto;
-            animation: shimmer 3s linear infinite;
-            pointer-events: none;
-          }}
-          .prize-top-label {{
-            font-size: 11px;
-            font-weight: 800;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            color: #77c4a5;
-            margin-bottom: 12px;
-            text-align: center;
-          }}
-          .prize-row {{
-            display: flex;
-            gap: 8px;
-            margin-bottom: 6px;
-          }}
-          .prize-card {{
-            flex: 1;
-            background: rgba(255,255,255,0.92);
-            border: 1px solid rgba(15,23,42,.08);
-            border-radius: 12px;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-          }}
-          .prize-media {{
-            width: 100%;
-          }}
-          .prize-name {{
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            color: #335369;
-            padding: 10px 0 4px;
-            text-align: center;
-          }}
-          .prize-count {{
-            font-size: 12px;
-            font-weight: 700;
-            color: #00111f;
-            padding-bottom: 10px;
-          }}
-          @keyframes shimmer {{
-            from {{ background-position: 200% 0; }}
-            to {{ background-position: -200% 0; }}
-          }}
-        </style>
-        <div class="prize-banner">
-          <div class="prize-top-label">Prize Pool</div>
-          <div class="prize-row">
-            <div class="prize-card">
-              <div class="prize-media">{laptop_video_html}</div>
-              <div class="prize-name">Laptop</div>
-              <div class="prize-count">1 winner</div>
-            </div>
-            <div class="prize-card">
-              <div class="prize-media">{watch_video_html}</div>
-              <div class="prize-name">Smartwatch</div>
-              <div class="prize-count">3 winners</div>
-            </div>
-          </div>
+    st.markdown(f"""
+    <div class="prize-banner">
+      <div class="prize-top-label">Prize Pool</div>
+      <div style="display:flex;gap:8px;margin-bottom:6px">
+        <div style="flex:1;background:rgba(255,255,255,0.92);border:1px solid rgba(15,23,42,.08);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;align-items:center;">
+          <div style="width:100%">{laptop_video_html}</div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#335369;padding:10px 0 4px;text-align:center">Laptop</div>
+          <div style="font-size:12px;font-weight:700;color:#00111f;padding-bottom:10px">1 winner</div>
         </div>
-        <script>
-          (() => {{
-            const root = document.currentScript.parentElement;
-            const videos = root.querySelectorAll("video");
-            
-            const configureVideo = (video) => {{
-              if (!video) return;
-              video.muted = true;
-              video.autoplay = true;
-              video.loop = true;
-              video.controls = false;
-              video.playsInline = true;
-              
-              // Ensure no controls are shown
-              video.classList.add("no-controls");
-              
-              // Attempt autoplay on various events
-              const play = () => {{
-                const p = video.play();
-                if (p && typeof p.catch === "function") {{
-                  p.catch(() => {{}});
-                }}
-              }};
-              
-              if (video.readyState >= 2) {{
-                play();
-              }} else {{
-                video.addEventListener("loadedmetadata", play, {{ once: true }});
-              }}
-              
-              // Retry play on visibility change
-              document.addEventListener("visibilitychange", () => {{
-                if (!document.hidden && video.paused) {{
-                  play();
-                }}
-              }});
-            }};
-            
-            videos.forEach(configureVideo);
-          }})();
-        </script>
-        """,
-        height=230,
-        scrolling=False,
-    )
+        <div style="flex:1;background:rgba(255,255,255,0.92);border:1px solid rgba(15,23,42,.08);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;align-items:center;">
+          <div style="width:100%">{watch_video_html}</div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#335369;padding:10px 0 4px;text-align:center">Smartwatch</div>
+          <div style="font-size:12px;font-weight:700;color:#00111f;padding-bottom:10px">3 winners</div>
+        </div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     st.markdown("""
     <div class="form-shell">
