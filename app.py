@@ -1162,20 +1162,96 @@ def screen_register():
         </video>
         """
 
-    st.html(
+    components.html(
         f"""
+        <style>
+          body {{
+            margin: 0;
+            background: transparent;
+            font-family: 'Manrope', sans-serif;
+          }}
+          .prize-banner {{
+            border-radius: 22px;
+            padding: 18px;
+            background:
+              linear-gradient(180deg, rgba(255,255,255,0.16), rgba(3,94,137,0.22)),
+              radial-gradient(circle at 12% 18%, rgba(236,250,247,0.18), transparent 22%),
+              radial-gradient(circle at 86% 26%, rgba(6,194,172,0.18), transparent 24%);
+            border: 1px solid rgba(255,255,255,0.22);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 24px 48px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.22);
+            backdrop-filter: blur(20px) saturate(145%);
+            -webkit-backdrop-filter: blur(20px) saturate(145%);
+          }}
+          .prize-banner::after {{
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,.4) 50%, transparent 70%);
+            background-size: 200% auto;
+            animation: shimmer 3s linear infinite;
+            pointer-events: none;
+          }}
+          .prize-top-label {{
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #77c4a5;
+            margin-bottom: 12px;
+            text-align: center;
+          }}
+          .prize-row {{
+            display: flex;
+            gap: 8px;
+            margin-bottom: 6px;
+          }}
+          .prize-card {{
+            flex: 1;
+            background: rgba(255,255,255,0.92);
+            border: 1px solid rgba(15,23,42,.08);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+          }}
+          .prize-media {{
+            width: 100%;
+          }}
+          .prize-name {{
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #335369;
+            padding: 10px 0 4px;
+            text-align: center;
+          }}
+          .prize-count {{
+            font-size: 12px;
+            font-weight: 700;
+            color: #00111f;
+            padding-bottom: 10px;
+          }}
+          @keyframes shimmer {{
+            from {{ background-position: 200% 0; }}
+            to {{ background-position: -200% 0; }}
+          }}
+        </style>
         <div class="prize-banner">
           <div class="prize-top-label">Prize Pool</div>
-          <div style="display:flex;gap:8px;margin-bottom:6px">
-            <div style="flex:1;background:rgba(255,255,255,0.92);border:1px solid rgba(15,23,42,.08);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;align-items:center;">
-              <div style="width:100%">{laptop_video_html}</div>
-              <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#335369;padding:10px 0 4px;text-align:center">Laptop</div>
-              <div style="font-size:12px;font-weight:700;color:#00111f;padding-bottom:10px">1 winner</div>
+          <div class="prize-row">
+            <div class="prize-card">
+              <div class="prize-media">{laptop_video_html}</div>
+              <div class="prize-name">Laptop</div>
+              <div class="prize-count">1 winner</div>
             </div>
-            <div style="flex:1;background:rgba(255,255,255,0.92);border:1px solid rgba(15,23,42,.08);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;align-items:center;">
-              <div style="width:100%">{watch_video_html}</div>
-              <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#335369;padding:10px 0 4px;text-align:center">Smartwatch</div>
-              <div style="font-size:12px;font-weight:700;color:#00111f;padding-bottom:10px">3 winners</div>
+            <div class="prize-card">
+              <div class="prize-media">{watch_video_html}</div>
+              <div class="prize-name">Smartwatch</div>
+              <div class="prize-count">3 winners</div>
             </div>
           </div>
         </div>
@@ -1208,6 +1284,7 @@ def screen_register():
               requestAnimationFrame(attempt);
               setTimeout(attempt, 150);
               setTimeout(attempt, 800);
+              setTimeout(attempt, 1500);
             }};
             videos.forEach(tryPlay);
             document.addEventListener("visibilitychange", () => {{
@@ -1218,7 +1295,8 @@ def screen_register():
           }})();
         </script>
         """,
-        unsafe_allow_javascript=True,
+        height=230,
+        scrolling=False,
     )
 
     st.markdown("""
