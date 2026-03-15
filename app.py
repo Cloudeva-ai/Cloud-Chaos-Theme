@@ -1073,17 +1073,15 @@ def _image_data_uri(path: str) -> str:
     return f"data:image/{suffix};base64,{encoded}"
 
 
-@st.cache_data(show_spinner=False)
 def _get_video_source(filename: str) -> str:
     """
-    Get a lightweight video source as a data URI for decorative inline playback.
+    Return a Streamlit static-serving URL for the decorative prize videos.
+    This avoids embedding large base64 blobs in the initial page HTML.
     """
-    video_path = Path(__file__).parent / "Videos" / filename
-    if not video_path.exists():
+    static_video_path = Path(__file__).parent / "static" / filename
+    if not static_video_path.exists():
         return ""
-    suffix = video_path.suffix.lower().lstrip(".") or "mp4"
-    encoded = base64.b64encode(video_path.read_bytes()).decode("ascii")
-    return f"data:video/{suffix};base64,{encoded}"
+    return f"/app/static/{filename}"
 
 
 # ─────────────────────────────────────────────────────────────
