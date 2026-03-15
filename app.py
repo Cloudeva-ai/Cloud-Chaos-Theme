@@ -1081,7 +1081,7 @@ def _get_video_source(filename: str) -> str:
     static_video_path = Path(__file__).parent / "static" / filename
     if not static_video_path.exists():
         return ""
-    return f"/app/static/{filename}"
+    return f"app/static/{filename}"
 
 
 # ─────────────────────────────────────────────────────────────
