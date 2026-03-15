@@ -1074,18 +1074,43 @@ def _image_data_uri(path: str) -> str:
 
 
 @st.cache_data
-def _video_data_uri(path: str, mime_type: str) -> str:
-    video_path = Path(path)
-    encoded = base64.b64encode(video_path.read_bytes()).decode("ascii")
-    return f"data:{mime_type};base64,{encoded}"
+def _video_data_uri(path: str, mime_type: str) -> tuple[str | None, bool]:
+    """
+    Load video file as base64 data URI.
+    Returns (data_uri, success) tuple. If file missing, returns (None, False).
+    """
+    try:
+        video_path = Path(path)
+        if not video_path.exists():
+            return None, False
+        encoded = base64.b64encode(video_path.read_bytes()).decode("ascii")
+        return f"data:{mime_type};base64,{encoded}", True
+    except Exception:
+        return None, False
 
 
 def _preferred_video_asset(primary_name: str, preview_name: str) -> Path:
-    static_dir = Path(__file__).parent / "static"
+    """
+    Get video asset path, preferring preview version if available.
+    Works with both 'static/' and 'Videos/' directories.
+    """
+    app_root = Path(__file__).parent
+    
+    # Try static/ directory first
+    static_dir = app_root / "static"
     preview_path = static_dir / preview_name
     if preview_path.exists():
         return preview_path
-    return static_dir / primary_name
+    main_path = static_dir / primary_name
+    if main_path.exists():
+        return main_path
+    
+    # Fallback to Videos/ directory
+    videos_dir = app_root / "Videos"
+    preview_path = videos_dir / preview_name
+    if preview_path.exists():
+        return preview_path
+    return videos_dir / primary_name
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1138,25 +1163,23 @@ def screen_register():
     laptop_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Laptop</div>"
     watch_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Watch</div>"
 
-    if laptop_video_mp4.exists():
-        laptop_src = _video_data_uri(str(laptop_video_mp4), "video/mp4")
+    # Laptop video
+    laptop_src, laptop_loaded = _video_data_uri(str(laptop_video_mp4), "video/mp4")
+    if laptop_loaded and laptop_src:
         laptop_video_html = f"""
-        <video autoplay loop muted playsinline webkit-playsinline preload="none"
+        <video autoplay loop muted playsinline webkit-playsinline preload="metadata"
                disablepictureinpicture disableremoteplayback
-               controlslist="nodownload noplaybackrate nofullscreen noremoteplayback"
-               tabindex="-1" aria-hidden="true"
                style="width:100%;height:140px;object-fit:cover;display:block;background:#fff;pointer-events:none;">
           <source src="{laptop_src}" type="video/mp4">
         </video>
         """
 
-    if watch_video.exists():
-        watch_src = _video_data_uri(str(watch_video), "video/mp4")
+    # Smartwatch video
+    watch_src, watch_loaded = _video_data_uri(str(watch_video), "video/mp4")
+    if watch_loaded and watch_src:
         watch_video_html = f"""
-        <video autoplay loop muted playsinline webkit-playsinline preload="none"
+        <video autoplay loop muted playsinline webkit-playsinline preload="metadata"
                disablepictureinpicture disableremoteplayback
-               controlslist="nodownload noplaybackrate nofullscreen noremoteplayback"
-               tabindex="-1" aria-hidden="true"
                style="width:100%;height:140px;object-fit:cover;display:block;background:#fff;pointer-events:none;">
           <source src="{watch_src}" type="video/mp4">
         </video>
@@ -1259,39 +1282,41 @@ def screen_register():
           (() => {{
             const root = document.currentScript.parentElement;
             const videos = root.querySelectorAll("video");
-            const tryPlay = (video) => {{
+            
+            const configureVideo = (video) => {{
               if (!video) return;
               video.muted = true;
-              video.defaultMuted = true;
               video.autoplay = true;
               video.loop = true;
               video.controls = false;
               video.playsInline = true;
-              video.setAttribute("muted", "");
-              video.setAttribute("autoplay", "");
-              video.setAttribute("loop", "");
-              video.setAttribute("playsinline", "");
-              video.setAttribute("webkit-playsinline", "");
-              const attempt = () => {{
-                const promise = video.play();
-                if (promise && typeof promise.catch === "function") {{
-                  promise.catch(() => {{}});
+              
+              // Ensure no controls are shown
+              video.classList.add("no-controls");
+              
+              // Attempt autoplay on various events
+              const play = () => {{
+                const p = video.play();
+                if (p && typeof p.catch === "function") {{
+                  p.catch(() => {{}});
                 }}
               }};
-              video.addEventListener("loadedmetadata", attempt);
-              video.addEventListener("loadeddata", attempt);
-              video.addEventListener("canplay", attempt);
-              requestAnimationFrame(attempt);
-              setTimeout(attempt, 150);
-              setTimeout(attempt, 800);
-              setTimeout(attempt, 1500);
-            }};
-            videos.forEach(tryPlay);
-            document.addEventListener("visibilitychange", () => {{
-              if (!document.hidden) {{
-                videos.forEach(tryPlay);
+              
+              if (video.readyState >= 2) {{
+                play();
+              }} else {{
+                video.addEventListener("loadedmetadata", play, {{ once: true }});
               }}
-            }});
+              
+              // Retry play on visibility change
+              document.addEventListener("visibilitychange", () => {{
+                if (!document.hidden && video.paused) {{
+                  play();
+                }}
+              }});
+            }};
+            
+            videos.forEach(configureVideo);
           }})();
         </script>
         """,
