@@ -19,6 +19,7 @@ import re
 import threading
 import time
 from functools import lru_cache
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -72,6 +73,7 @@ def _set_sqlite_pragmas(dbapi_connection, _connection_record):
     cursor.close()
 
 SessionFactory = sessionmaker(bind=ENGINE, autoflush=False, autocommit=False, expire_on_commit=False)
+LOGGER = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -347,7 +349,10 @@ def upsert_player(name: str, company: str, email: str) -> tuple[Player, bool]:
             db.commit()
             is_new = False
 
-        _export_registration_backup(include_snapshot=True)
+        try:
+            _export_registration_backup(include_snapshot=True)
+        except Exception:
+            LOGGER.exception("Registration backup export failed after player upsert.")
         _invalidate_read_caches()
         return player, is_new
 

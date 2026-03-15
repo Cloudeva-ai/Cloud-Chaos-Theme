@@ -46,7 +46,7 @@ _init_database()
 #  GLOBAL CSS  (mobile-first)
 # ─────────────────────────────────────────────────────────────
 st.markdown("""
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#00111f">
@@ -1065,7 +1065,7 @@ def _mobile_haptic(duration_ms: int = 18) -> None:
     )
 
 
-@st.cache_data
+@st.cache_data(show_spinner=False)
 def _image_data_uri(path: str) -> str:
     image_path = Path(path)
     suffix = image_path.suffix.lower().lstrip(".") or "png"
@@ -1073,9 +1073,10 @@ def _image_data_uri(path: str) -> str:
     return f"data:image/{suffix};base64,{encoded}"
 
 
+@st.cache_data(show_spinner=False)
 def _get_video_source(filename: str) -> str:
     """
-    Get video source from the main files in Videos/ as a data URI.
+    Get a lightweight video source as a data URI for decorative inline playback.
     """
     video_path = Path(__file__).parent / "Videos" / filename
     if not video_path.exists():
@@ -1130,16 +1131,16 @@ def screen_register():
     """, unsafe_allow_html=True)
 
     # Get video sources
-    laptop_src = _get_video_source("Laptop_3d.mp4")
-    watch_src = _get_video_source("SmartWatch_3d.mp4")
+    laptop_src = _get_video_source("Laptop_3d_preview.mp4")
+    watch_src = _get_video_source("SmartWatch_3d_preview.mp4")
 
     # Video HTML - simple & reliable format
     laptop_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Laptop</div>"
     watch_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Smartwatch</div>"
     if laptop_src:
-        laptop_video_html = f"""<video autoplay loop muted playsinline style="width:100%;height:140px;object-fit:cover;display:block;background:#000;" crossorigin="anonymous"><source src="{laptop_src}" type="video/mp4"></video>"""
+        laptop_video_html = f"""<video autoplay loop muted playsinline preload="metadata" style="width:100%;height:140px;object-fit:cover;display:block;background:#000;" crossorigin="anonymous"><source src="{laptop_src}" type="video/mp4"></video>"""
     if watch_src:
-        watch_video_html = f"""<video autoplay loop muted playsinline style="width:100%;height:140px;object-fit:cover;display:block;background:#000;" crossorigin="anonymous"><source src="{watch_src}" type="video/mp4"></video>"""
+        watch_video_html = f"""<video autoplay loop muted playsinline preload="metadata" style="width:100%;height:140px;object-fit:cover;display:block;background:#000;" crossorigin="anonymous"><source src="{watch_src}" type="video/mp4"></video>"""
 
     st.markdown(f"""
     <div class="prize-banner">
