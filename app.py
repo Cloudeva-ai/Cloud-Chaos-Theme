@@ -1073,20 +1073,36 @@ def _image_data_uri(path: str) -> str:
     return f"data:image/{suffix};base64,{encoded}"
 
 
-@st.cache_data
-def _video_data_uri(path: str) -> str:
-    video_path = Path(path)
-    suffix = video_path.suffix.lower().lstrip(".") or "mp4"
-    encoded = base64.b64encode(video_path.read_bytes()).decode("ascii")
-    return f"data:video/{suffix};base64,{encoded}"
+def _video_source(filename: str) -> str:
+    """
+    Get video source URL.
+    - Local: tries base64 encoding if file exists
+    - Streamlit Cloud: uses GitHub raw URL
+    """
+    # Try local file first
+    static_dir = Path(__file__).parent / "static"
+    local_path = static_dir / filename
+    
+    if local_path.exists():
+        try:
+            suffix = local_path.suffix.lower().lstrip(".") or "mp4"
+            encoded = base64.b64encode(local_path.read_bytes()).decode("ascii")
+            return f"data:video/{suffix};base64,{encoded}"
+        except Exception:
+            pass
+    
+    # Fallback to GitHub raw URL
+    return f"https://raw.githubusercontent.com/Cloudeva-ai/Cloud-Chaos-Theme/main/static/{filename}"
 
 
-def _preferred_video_asset(primary_name: str, preview_name: str) -> Path:
+def _preferred_video_asset(primary_name: str, preview_name: str) -> str:
+    """Get video URL, preferring preview version."""
     static_dir = Path(__file__).parent / "static"
     preview_path = static_dir / preview_name
-    if preview_path.exists():
-        return preview_path
-    return static_dir / primary_name
+    
+    # Use preview if it exists locally, otherwise use main
+    filename = preview_name if preview_path.exists() else primary_name
+    return _video_source(filename)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1133,33 +1149,28 @@ def screen_register():
     </div>
     """, unsafe_allow_html=True)
 
-    laptop_video_mp4 = Path(__file__).parent / "static" / "Laptop_3d_preview.mp4"
-    watch_video = Path(__file__).parent / "static" / "SmartWatch_3d_preview.mp4"
+    # Get video sources (works both locally and on Streamlit Cloud)
+    laptop_src = _preferred_video_asset("Laptop_3d.mp4", "Laptop_3d_preview.mp4")
+    watch_src = _preferred_video_asset("SmartWatch_3d.mp4", "SmartWatch_3d_preview.mp4")
 
-    laptop_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Laptop</div>"
-    watch_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Watch</div>"
+    # Video HTML with sources
+    laptop_video_html = f"""
+    <video src="{laptop_src}" autoplay loop muted playsinline webkit-playsinline preload="metadata"
+           poster=""
+           onloadedmetadata="this.play().catch(() => {{}})"
+           oncanplay="this.play().catch(() => {{}})"
+           style="width:100%;height:140px;object-fit:cover;display:block;background:#fff">
+    </video>
+    """
 
-    if laptop_video_mp4.exists():
-        laptop_src = _video_data_uri(laptop_video_mp4)
-        laptop_video_html = f"""
-        <video src="{laptop_src}" autoplay loop muted playsinline webkit-playsinline preload="metadata"
-               poster=""
-               onloadedmetadata="this.play().catch(() => {{}})"
-               oncanplay="this.play().catch(() => {{}})"
-               style="width:100%;height:140px;object-fit:cover;display:block;background:#fff">
-        </video>
-        """
-
-    if watch_video.exists():
-        watch_src = _video_data_uri(watch_video)
-        watch_video_html = f"""
-        <video src="{watch_src}" autoplay loop muted playsinline webkit-playsinline preload="metadata"
-               poster=""
-               onloadedmetadata="this.play().catch(() => {{}})"
-               oncanplay="this.play().catch(() => {{}})"
-               style="width:100%;height:140px;object-fit:cover;display:block;background:#fff">
-        </video>
-        """
+    watch_video_html = f"""
+    <video src="{watch_src}" autoplay loop muted playsinline webkit-playsinline preload="metadata"
+           poster=""
+           onloadedmetadata="this.play().catch(() => {{}})"
+           oncanplay="this.play().catch(() => {{}})"
+           style="width:100%;height:140px;object-fit:cover;display:block;background:#fff">
+    </video>
+    """
 
     st.markdown(f"""
     <div class="prize-banner">
