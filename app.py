@@ -1075,33 +1075,14 @@ def _image_data_uri(path: str) -> str:
 
 def _get_video_source(filename: str) -> str:
     """
-    Get video source URL - works both locally and on Streamlit Cloud.
-    Always prefers smallest/preview versions.
+    Get video source from the main files in Videos/ as a data URI.
     """
-    static_dir = Path(__file__).parent / "static"
-    
-    # Map main files to preview files
-    preview_map = {
-        "Laptop_3d.mp4": "Laptop_3d_preview.mp4",
-        "SmartWatch_3d.mp4": "SmartWatch_3d_preview.mp4",
-    }
-    
-    # Use preview if provided or mapped
-    if filename in preview_map:
-        filename = preview_map[filename]
-    
-    # Try local file first for fastest loading
-    local_path = static_dir / filename
-    if local_path.exists():
-        try:
-            suffix = local_path.suffix.lower().lstrip(".") or "mp4"
-            encoded = base64.b64encode(local_path.read_bytes()).decode("ascii")
-            return f"data:video/{suffix};base64,{encoded}"
-        except Exception:
-            pass
-    
-    # Fallback to GitHub raw URL (always use this if local fails)
-    return f"https://raw.githubusercontent.com/Cloudeva-ai/Cloud-Chaos-Theme/main/static/{filename}"
+    video_path = Path(__file__).parent / "Videos" / filename
+    if not video_path.exists():
+        return ""
+    suffix = video_path.suffix.lower().lstrip(".") or "mp4"
+    encoded = base64.b64encode(video_path.read_bytes()).decode("ascii")
+    return f"data:video/{suffix};base64,{encoded}"
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1153,8 +1134,12 @@ def screen_register():
     watch_src = _get_video_source("SmartWatch_3d.mp4")
 
     # Video HTML - simple & reliable format
-    laptop_video_html = f"""<video autoplay loop muted playsinline style="width:100%;height:140px;object-fit:cover;display:block;background:#000;" crossorigin="anonymous"><source src="{laptop_src}" type="video/mp4"></video>"""
-    watch_video_html = f"""<video autoplay loop muted playsinline style="width:100%;height:140px;object-fit:cover;display:block;background:#000;" crossorigin="anonymous"><source src="{watch_src}" type="video/mp4"></video>"""
+    laptop_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Laptop</div>"
+    watch_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Smartwatch</div>"
+    if laptop_src:
+        laptop_video_html = f"""<video autoplay loop muted playsinline style="width:100%;height:140px;object-fit:cover;display:block;background:#000;" crossorigin="anonymous"><source src="{laptop_src}" type="video/mp4"></video>"""
+    if watch_src:
+        watch_video_html = f"""<video autoplay loop muted playsinline style="width:100%;height:140px;object-fit:cover;display:block;background:#000;" crossorigin="anonymous"><source src="{watch_src}" type="video/mp4"></video>"""
 
     st.markdown(f"""
     <div class="prize-banner">
