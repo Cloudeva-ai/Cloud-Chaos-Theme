@@ -35,7 +35,12 @@ st.set_page_config(
 # ─────────────────────────────────────────────────────────────
 #  INIT DB
 # ─────────────────────────────────────────────────────────────
-db.init_db()
+@st.cache_resource
+def _init_database() -> None:
+    db.init_db()
+
+
+_init_database()
 
 # ─────────────────────────────────────────────────────────────
 #  GLOBAL CSS  (mobile-first)
@@ -586,6 +591,72 @@ div[data-testid="stForm"] {
 /* ── Result title / sub ── */
 .result-title { font-size: clamp(28px, 8vw, 44px); font-weight: 800; text-align: center; color: var(--text); letter-spacing: -0.8px; }
 .result-sub   { font-size: 13px; color: var(--muted); text-align: center; line-height: 1.6; }
+.results-shell {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+.results-panel {
+  position: relative;
+  overflow: hidden;
+  margin: 12px 0;
+  padding: 16px;
+  border-radius: calc(var(--radius) + 4px);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.16), rgba(4,112,162,0.24)),
+    radial-gradient(circle at 18% 28%, rgba(236,250,247,0.18), transparent 28%),
+    radial-gradient(circle at 76% 22%, rgba(6,194,172,0.16), transparent 26%),
+    radial-gradient(circle at 66% 78%, rgba(172,219,200,0.12), transparent 24%);
+  border: 1px solid rgba(255,255,255,0.22);
+  box-shadow: var(--shadow2), inset 0 1px 0 rgba(255,255,255,0.22);
+  backdrop-filter: blur(20px) saturate(145%);
+  -webkit-backdrop-filter: blur(20px) saturate(145%);
+}
+.results-panel::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  bottom: -16px;
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle, rgba(172,219,200,0.20), transparent 68%);
+  pointer-events: none;
+}
+.result-breakdown-row {
+  display:flex;
+  gap:8px;
+  margin-bottom:8px;
+}
+.result-breakdown-card {
+  flex:1;
+  position:relative;
+  overflow:hidden;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.16), rgba(3,94,137,0.20)),
+    radial-gradient(circle at 18% 18%, rgba(236,250,247,0.12), transparent 24%);
+  border:1px solid rgba(255,255,255,0.18);
+  border-top-width:3px;
+  border-radius:16px;
+  padding:12px 10px;
+  box-shadow: 0 14px 28px rgba(0,17,31,0.08), inset 0 1px 0 rgba(255,255,255,0.16);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+.lucky-draw-card {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.18), rgba(6,194,172,0.18)),
+    radial-gradient(circle at 18% 20%, rgba(236,250,247,0.18), transparent 24%),
+    radial-gradient(circle at 84% 24%, rgba(29,248,222,0.16), transparent 20%);
+  border: 1px solid rgba(255,255,255,0.24);
+  border-radius: calc(var(--radius) - 4px);
+  padding: 14px;
+  text-align: center;
+  margin: 10px 0;
+  box-shadow: 0 14px 32px rgba(0,17,31,0.10), inset 0 1px 0 rgba(255,255,255,0.18);
+  backdrop-filter: blur(18px) saturate(145%);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
+}
 
 /* ── Breakdown cells ── */
 .bd-row   { display: flex; gap: 6px; width: 100%; margin-bottom: 12px; }
@@ -601,10 +672,10 @@ div[data-testid="stForm"] {
 .lb-title {
   font-size: clamp(28px, 9vw, 44px); font-weight: 800;
   color: var(--text);
-  text-align: center; margin-bottom: 2px;
+  text-align: center; margin: 0 0 2px;
   letter-spacing: -1px;
 }
-.lb-sub  { font-size: 12px; color: var(--muted); text-align: center; margin-bottom: 16px; }
+.lb-sub  { font-size: 12px; color: var(--muted); text-align: center; margin: 0 0 16px; }
 .lb-item {
   position: relative;
   overflow: hidden;
@@ -622,6 +693,18 @@ div[data-testid="stForm"] {
 .lb-sc   { font-family: 'JetBrains Mono', monospace; font-size: 17px; font-weight: 700; color: #ffffff; text-align: right; }
 .lb-time { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted); text-align: right; }
 .r1 { color: #035e89; } .r2 { color: #06c2ac; } .r3 { color: #77c4a5; }
+.stButton > button[kind="secondary"] {
+  background: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(3,94,137,0.28)) !important;
+  border: 1px solid rgba(255,255,255,0.24) !important;
+  color: #ffffff !important;
+  box-shadow: 0 14px 28px rgba(0,17,31,0.12), inset 0 1px 0 rgba(255,255,255,0.16) !important;
+  backdrop-filter: blur(18px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(140%) !important;
+}
+.stButton > button[kind="secondary"]:hover {
+  border-color: rgba(255,255,255,0.34) !important;
+  box-shadow: 0 18px 34px rgba(0,17,31,0.16), inset 0 1px 0 rgba(255,255,255,0.18) !important;
+}
 
 /* ── Streamlit form / input overrides ── */
 div[data-testid="stForm"] {
@@ -693,6 +776,35 @@ div[data-testid="stForm"] {
 }
 .stButton > button[kind="primary"]:active {
   box-shadow: 0 2px 8px rgba(2,60,87,0.18) !important;
+}
+.cta-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 56px;
+  padding: 14px 18px;
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.18), rgba(4,112,162,0.26)),
+    radial-gradient(circle at 18% 28%, rgba(236,250,247,0.16), transparent 28%),
+    radial-gradient(circle at 78% 24%, rgba(6,194,172,0.16), transparent 24%);
+  border: 1px solid rgba(255,255,255,0.24);
+  color: #ffffff !important;
+  text-decoration: none !important;
+  font-family: 'Manrope', sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  line-height: 1.2;
+  box-shadow: 0 14px 28px rgba(0,17,31,0.12), inset 0 1px 0 rgba(255,255,255,0.16);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  margin: 0 0 12px;
+}
+.cta-link:hover {
+  border-color: rgba(255,255,255,0.34);
+  box-shadow: 0 18px 34px rgba(0,17,31,0.16), inset 0 1px 0 rgba(255,255,255,0.18);
 }
 /* Secondary */
 .stButton > button[kind="secondary"] {
@@ -854,13 +966,18 @@ details > summary:hover {
 }
 .score-hole {
   width:106px; height:106px; border-radius:50%;
-  background:rgba(255,255,255,0.92); position:absolute;
+  background:
+    linear-gradient(180deg, rgba(2,60,87,0.82), rgba(0,17,31,0.90)),
+    radial-gradient(circle at 30% 22%, rgba(29,248,222,0.12), transparent 28%);
+  border: 1px solid rgba(255,255,255,0.18);
+  position:absolute;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
-  box-shadow: inset 0 2px 8px rgba(2,60,87,0.08);
-  backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.14), 0 12px 24px rgba(0,17,31,0.18);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
 }
-.score-num  { font-size:38px; font-weight:800; color:var(--text); line-height:1; }
-.score-denom{ font-size:13px; color:var(--muted); font-weight:600; }
+.score-num  { font-size:38px; font-weight:800; color:#ffffff !important; line-height:1; text-shadow: 0 6px 18px rgba(0,0,0,0.24); }
+.score-denom{ font-size:13px; color:rgba(255,255,255,0.82); font-weight:700; }
 
 /* Result title pop */
 .result-title { animation: scorePop .5s cubic-bezier(.22,1,.36,1) both .3s; }
@@ -881,6 +998,7 @@ details > summary:hover {
     white-space: normal;
   }
 }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -955,11 +1073,8 @@ def _image_data_uri(path: str) -> str:
     return f"data:image/{suffix};base64,{encoded}"
 
 
-@st.cache_data
-def _video_data_uri(path: str, mime_type: str) -> str:
-    video_path = Path(path)
-    encoded = base64.b64encode(video_path.read_bytes()).decode("ascii")
-    return f"data:{mime_type};base64,{encoded}"
+def _static_asset_url(filename: str) -> str:
+    return f"/app/static/{filename}"
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1012,24 +1127,24 @@ def screen_register():
     watch_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Watch</div>"
 
     if laptop_video_mp4.exists():
-        laptop_src = _video_data_uri(str(laptop_video_mp4), "video/mp4")
+        laptop_src = _static_asset_url(laptop_video_mp4.name)
         laptop_video_html = f"""
-        <video autoplay loop muted playsinline preload="auto"
+        <video src="{laptop_src}" autoplay loop muted playsinline webkit-playsinline preload="metadata"
                poster=""
                onloadedmetadata="this.play().catch(() => {{}})"
+               oncanplay="this.play().catch(() => {{}})"
                style="width:100%;height:140px;object-fit:cover;display:block;background:#fff">
-          <source src="{laptop_src}" type="video/mp4">
         </video>
         """
 
     if watch_video.exists():
-        watch_src = _video_data_uri(str(watch_video), "video/mp4")
+        watch_src = _static_asset_url(watch_video.name)
         watch_video_html = f"""
-        <video autoplay loop muted playsinline preload="auto"
+        <video src="{watch_src}" autoplay loop muted playsinline webkit-playsinline preload="metadata"
                poster=""
                onloadedmetadata="this.play().catch(() => {{}})"
+               oncanplay="this.play().catch(() => {{}})"
                style="width:100%;height:140px;object-fit:cover;display:block;background:#fff">
-          <source src="{watch_src}" type="video/mp4">
         </video>
         """
 
@@ -1066,7 +1181,7 @@ def screen_register():
         company = st.text_input("Company",      placeholder="rapyder cloud solutions",       key="reg_company")
         email   = st.text_input("Work Email",   placeholder="vamsikrishna@rapyder.com",      key="reg_email")
         submitted = st.form_submit_button(
-            "🚀  Start the Challenge →",
+            "Start the Challenge →",
             use_container_width=True,
             type="primary",
         )
@@ -1440,23 +1555,25 @@ def screen_results():
     elapsed   = time.time() - (st.session_state.game_start_time or time.time())
     time_used = min(int(elapsed), gd.GAME_DURATION)
 
+    st.markdown('<div class="results-shell">', unsafe_allow_html=True)
     # Pure-CSS score ring (no Plotly, instant on mobile)
     pct_deg = int((score / gd.NUM_PAINS) * 360)
     pct_css = f"{int((score / gd.NUM_PAINS) * 100)}%"
     tier_emoji = tier["emoji"]
     st.markdown(f"""
-    <div class="score-ring-wrap">
-      <div class="score-ring" style="--pct:{pct_css}">
-        <div class="score-hole">
-          <div class="score-num">{score}</div>
-          <div class="score-denom">/ {gd.NUM_PAINS}</div>
+    <div class="results-panel">
+      <div class="score-ring-wrap">
+        <div class="score-ring" style="--pct:{pct_css}">
+          <div class="score-hole">
+            <div class="score-num">{score}</div>
+            <div class="score-denom">/ {gd.NUM_PAINS}</div>
+          </div>
         </div>
       </div>
+      <div class="result-title">{tier["emoji"]} {tier["title"]}</div>
+      <p class="result-sub">{tier["sub"]}</p>
     </div>
     """, unsafe_allow_html=True)
-
-    st.markdown(f'<div class="result-title">{tier["emoji"]} {tier["title"]}</div>', unsafe_allow_html=True)
-    st.markdown(f'<p class="result-sub">{tier["sub"]}</p>', unsafe_allow_html=True)
 
     st.markdown(f"""
     <div class="eva-box">
@@ -1479,9 +1596,7 @@ def screen_results():
             ow_ic = "✓" if bd["owner_correct"]  else "✗"
             im_ic = "✓" if bd["impact_correct"] else "✗"
             cells += f"""
-            <div style="flex:1;background:var(--surface);border:1px solid {col}33;
-                 border-top:3px solid {col};border-radius:12px;padding:12px 10px;
-                 box-shadow:var(--shadow)">
+            <div class="result-breakdown-card" style="border-top-color:{col};">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
                 <span style="font-size:9px;font-weight:700;letter-spacing:1px;
                      text-transform:uppercase;color:{col}">{labels[i]}</span>
@@ -1494,16 +1609,15 @@ def screen_results():
                 <span style="color:{'#059669' if bd['impact_correct'] else '#DC2626'}">{im_ic}</span> Impact
               </div>
             </div>"""
-        rows_html += f'<div style="display:flex;gap:8px;margin-bottom:8px">{cells}</div>'
+        rows_html += f'<div class="result-breakdown-row">{cells}</div>'
     # If odd number, last card is full-width (5th pain)
-    st.markdown(rows_html, unsafe_allow_html=True)
+    st.markdown(f'<div class="results-panel">{rows_html}</div>', unsafe_allow_html=True)
 
     if score == gd.NUM_PAINS:
         st.markdown("""
-        <div style="background:linear-gradient(135deg,rgba(2,60,87,0.08),rgba(6,194,172,0.16));border:1px solid rgba(6,194,172,0.28);
-             border-radius:12px;padding:14px;text-align:center;margin:8px 0">
+        <div class="lucky-draw-card">
           <div style="font-size:22px;margin-bottom:4px">🎰</div>
-          <div style="font-weight:700;color:var(--accent)">You're in the lucky draw!</div>
+          <div style="font-weight:800;color:#ffffff">You're in the lucky draw!</div>
           <div style="font-size:11px;color:var(--muted);margin-top:3px">Winner announced at the event</div>
         </div>
         """, unsafe_allow_html=True)
@@ -1513,12 +1627,16 @@ def screen_results():
         f'<span class="mono" style="color:var(--accent);font-weight:700">{ge.format_time(time_used)}</span></p>',
         unsafe_allow_html=True,
     )
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    if st.button("🚀  Start Free Preview →", use_container_width=True,
-                 type="primary", key="res_cta"):
-        import webbrowser
-        webbrowser.open("https://app.cloudeva.ai/auth/register")
+    st.markdown(
+        """
+        <a class="cta-link" href="https://app.cloudeva.ai/auth/register" target="_blank" rel="noopener noreferrer">
+          Start Free Preview →
+        </a>
+        """,
+        unsafe_allow_html=True,
+    )
 
     c_a, c_b = st.columns(2)
     with c_a:
@@ -1534,6 +1652,24 @@ def screen_results():
 #  ██  SCREEN: LEADERBOARD
 # ─────────────────────────────────────────────────────────────
 def screen_leaderboard():
+    components.html(
+        """
+        <script>
+        const hostWindow = window.parent;
+        const mainSection = hostWindow.document.querySelector('section.main');
+        const appView = hostWindow.document.querySelector('[data-testid="stAppViewContainer"]');
+        hostWindow.scrollTo({top: 0, behavior: 'instant'});
+        if (mainSection) {
+          mainSection.scrollTo({top: 0, behavior: 'instant'});
+        }
+        if (appView) {
+          appView.scrollTo({top: 0, behavior: 'instant'});
+        }
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
     st.markdown('<div class="lb-title">🏆 Leaderboard</div>', unsafe_allow_html=True)
     st.markdown('<p class="lb-sub">Top scores from today\'s event</p>', unsafe_allow_html=True)
 
@@ -1577,7 +1713,6 @@ def screen_leaderboard():
             """, unsafe_allow_html=True)
 
     # Aggregate stats
-    st.markdown("<br>", unsafe_allow_html=True)
     st.markdown(f"""
     <div class="cc-card" style="text-align:center">
       <div style="display:flex;justify-content:space-around;flex-wrap:wrap;gap:10px">
@@ -1616,7 +1751,6 @@ def screen_leaderboard():
             unsafe_allow_html=True,
         )
 
-    st.markdown("<br>", unsafe_allow_html=True)
     c_a, c_b = st.columns(2)
     with c_a:
         if st.button("← Back", use_container_width=True, key="lb_back"):

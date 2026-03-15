@@ -17,6 +17,7 @@ import json
 import os
 import re
 import threading
+import time
 from functools import lru_cache
 from datetime import datetime, timezone
 from pathlib import Path
@@ -50,6 +51,10 @@ REGISTRATION_BACKUP_PATH = Path(__file__).parent / "player_registrations_backup.
 REGISTRATION_BACKUP_CSV_PATH = Path(__file__).parent / "player_registrations_backup.csv"
 REGISTRATION_BACKUP_DIR = Path(__file__).parent / "registration_backups"
 BACKUP_LOCK = threading.Lock()
+BACKUP_MIN_INTERVAL_SECONDS = 10
+SNAPSHOT_MIN_INTERVAL_SECONDS = 300
+_last_backup_export_at = 0.0
+_last_snapshot_export_at = 0.0
 ENGINE  = create_engine(
     f"sqlite:///{DB_PATH}",
     connect_args={"check_same_thread": False, "timeout": 30},
@@ -198,7 +203,6 @@ class Event(Base):
 def init_db() -> None:
     """Create all tables if they don't exist. Safe to call on every startup."""
     Base.metadata.create_all(ENGINE)
-    _export_registration_backup()
 
 
 def _invalidate_read_caches() -> None:
@@ -249,11 +253,25 @@ def _validate_event_payload(payload: str) -> str:
     return clean_payload
 
 
-def _export_registration_backup() -> None:
+def _export_registration_backup(
+    *,
+    force: bool = False,
+    include_snapshot: bool = False,
+) -> None:
     """
     Export the registration table to an Excel workbook atomically.
     This gives the event team a non-database backup they can open directly.
     """
+    global _last_backup_export_at, _last_snapshot_export_at
+
+    now = time.monotonic()
+    should_write_current = force or (now - _last_backup_export_at) >= BACKUP_MIN_INTERVAL_SECONDS
+    should_write_snapshot = include_snapshot and (
+        force or (now - _last_snapshot_export_at) >= SNAPSHOT_MIN_INTERVAL_SECONDS
+    )
+    if not should_write_current and not should_write_snapshot:
+        return
+
     with SessionFactory() as db:
         rows = db.execute(text("""
             SELECT
@@ -277,19 +295,24 @@ def _export_registration_backup() -> None:
             "last_seen", "total_plays", "best_score", "best_time",
         ])
 
-    temp_path = REGISTRATION_BACKUP_PATH.with_suffix(".tmp.xlsx")
-    temp_csv_path = REGISTRATION_BACKUP_CSV_PATH.with_suffix(".tmp.csv")
-    snapshot_stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    snapshot_excel_path = REGISTRATION_BACKUP_DIR / f"player_registrations_{snapshot_stamp}.xlsx"
-    snapshot_csv_path = REGISTRATION_BACKUP_DIR / f"player_registrations_{snapshot_stamp}.csv"
     with BACKUP_LOCK:
         REGISTRATION_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-        df.to_excel(temp_path, index=False, sheet_name="registrations")
-        df.to_csv(temp_csv_path, index=False)
-        os.replace(temp_path, REGISTRATION_BACKUP_PATH)
-        os.replace(temp_csv_path, REGISTRATION_BACKUP_CSV_PATH)
-        df.to_excel(snapshot_excel_path, index=False, sheet_name="registrations")
-        df.to_csv(snapshot_csv_path, index=False)
+        if should_write_current:
+            temp_path = REGISTRATION_BACKUP_PATH.with_suffix(".tmp.xlsx")
+            temp_csv_path = REGISTRATION_BACKUP_CSV_PATH.with_suffix(".tmp.csv")
+            df.to_excel(temp_path, index=False, sheet_name="registrations")
+            df.to_csv(temp_csv_path, index=False)
+            os.replace(temp_path, REGISTRATION_BACKUP_PATH)
+            os.replace(temp_csv_path, REGISTRATION_BACKUP_CSV_PATH)
+            _last_backup_export_at = time.monotonic()
+
+        if should_write_snapshot:
+            snapshot_stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            snapshot_excel_path = REGISTRATION_BACKUP_DIR / f"player_registrations_{snapshot_stamp}.xlsx"
+            snapshot_csv_path = REGISTRATION_BACKUP_DIR / f"player_registrations_{snapshot_stamp}.csv"
+            df.to_excel(snapshot_excel_path, index=False, sheet_name="registrations")
+            df.to_csv(snapshot_csv_path, index=False)
+            _last_snapshot_export_at = time.monotonic()
 
 
 def upsert_player(name: str, company: str, email: str) -> tuple[Player, bool]:
@@ -324,7 +347,7 @@ def upsert_player(name: str, company: str, email: str) -> tuple[Player, bool]:
             db.commit()
             is_new = False
 
-        _export_registration_backup()
+        _export_registration_backup(include_snapshot=True)
         _invalidate_read_caches()
         return player, is_new
 
