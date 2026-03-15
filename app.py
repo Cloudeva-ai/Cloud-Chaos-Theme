@@ -1076,11 +1076,9 @@ def _image_data_uri(path: str) -> str:
 @st.cache_data(show_spinner=False)
 def _get_video_source(filename: str) -> str:
     """
-    Get a video source as a data URI for decorative inline playback.
-    Streamlit's app static handler does not serve mp4 with a video MIME type,
-    so the lightweight preview assets are embedded directly instead.
+    Get video source from the main files in Videos/ as a data URI.
     """
-    video_path = Path(__file__).parent / "static" / filename
+    video_path = Path(__file__).parent / "Videos" / filename
     if not video_path.exists():
         return ""
     suffix = video_path.suffix.lower().lstrip(".") or "mp4"
@@ -1133,8 +1131,8 @@ def screen_register():
     """, unsafe_allow_html=True)
 
     # Get video sources
-    laptop_src = _get_video_source("Laptop_3d_preview.mp4")
-    watch_src = _get_video_source("SmartWatch_3d_preview.mp4")
+    laptop_src = _get_video_source("Laptop_3d.mp4")
+    watch_src = _get_video_source("SmartWatch_3d.mp4")
 
     # Video HTML - simple & reliable format
     laptop_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Laptop</div>"
