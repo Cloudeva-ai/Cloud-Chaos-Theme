@@ -17,7 +17,6 @@ from pathlib import Path
 
 import streamlit as st
 import streamlit.components.v1 as components
-from streamlit import runtime
 
 import database as db
 import game_data as gd
@@ -406,12 +405,21 @@ div[data-testid="stForm"] {
   overflow: hidden;
   text-align: center;
 }
-.prize-video-frame {
-  width: 100%;
-  height: 140px;
+.prize-video-card div[data-testid="stVideo"] {
+  line-height: 0;
+  margin: 0;
+}
+.prize-video-card div[data-testid="stVideo"] video {
+  width: 100% !important;
+  height: 140px !important;
   object-fit: cover;
   display: block;
   background: #000;
+  border-radius: 0 !important;
+  pointer-events: none;
+}
+.prize-video-card div[data-testid="stVideo"] video::-webkit-media-controls {
+  display: none !important;
 }
 .prize-card-label {
   font-size: 10px;
@@ -1108,16 +1116,24 @@ def _get_video_path(filename: str) -> Path | None:
     return video_path if video_path.exists() else None
 
 
-def _get_video_source(filename: str) -> str:
+def _render_prize_video_card(filename: str, label: str, winners: str) -> None:
+    st.markdown('<div class="prize-video-card">', unsafe_allow_html=True)
     video_path = _get_video_path(filename)
-    if video_path is None:
-        return ""
-    if runtime.exists():
-        media_key = f"prize-video::{filename}"
-        return runtime.get_instance().media_file_mgr.add(str(video_path), "video/mp4", media_key)
-    suffix = video_path.suffix.lower().lstrip(".") or "mp4"
-    encoded = base64.b64encode(video_path.read_bytes()).decode("ascii")
-    return f"data:video/{suffix};base64,{encoded}"
+    if video_path is not None:
+        st.video(str(video_path), autoplay=True, muted=True, loop=True)
+    else:
+        st.markdown(
+            f"<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>{label}</div>",
+            unsafe_allow_html=True,
+        )
+    st.markdown(
+        f"""
+        <div class="prize-card-label">{label}</div>
+        <div class="prize-card-winners">{winners}</div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1164,33 +1180,43 @@ def screen_register():
     </div>
     """, unsafe_allow_html=True)
 
-    laptop_src = _get_video_source("Laptop_3d.mp4")
-    watch_src = _get_video_source("SmartWatch_3d.mp4")
-
-    laptop_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Laptop</div>"
-    watch_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Smartwatch</div>"
-    if laptop_src:
-        laptop_video_html = f"""<video class="prize-video-frame" autoplay loop muted playsinline preload="metadata" crossorigin="anonymous"><source src="{laptop_src}" type="video/mp4"></video>"""
-    if watch_src:
-        watch_video_html = f"""<video class="prize-video-frame" autoplay loop muted playsinline preload="metadata" crossorigin="anonymous"><source src="{watch_src}" type="video/mp4"></video>"""
-
-    st.markdown(f"""
+    st.markdown("""
     <div class="prize-banner">
       <div class="prize-top-label">Prize Pool</div>
-      <div style="display:flex;gap:8px;margin-bottom:6px">
-        <div class="prize-video-card" style="flex:1">
-          <div style="width:100%">{laptop_video_html}</div>
-          <div class="prize-card-label">Laptop</div>
-          <div class="prize-card-winners">1 winner</div>
-        </div>
-        <div class="prize-video-card" style="flex:1">
-          <div style="width:100%">{watch_video_html}</div>
-          <div class="prize-card-label">Smartwatch</div>
-          <div class="prize-card-winners">3 winners</div>
-        </div>
-      </div>
     </div>
     """, unsafe_allow_html=True)
+    col_laptop, col_watch = st.columns(2, gap="small")
+    with col_laptop:
+        _render_prize_video_card("Laptop_3d.mp4", "Laptop", "1 winner")
+    with col_watch:
+        _render_prize_video_card("SmartWatch_3d.mp4", "Smartwatch", "3 winners")
+    components.html(
+        """
+        <script>
+        const hostWindow = window.parent;
+        const syncPrizeVideos = () => {
+          const cards = hostWindow.document.querySelectorAll('.prize-video-card video[data-testid="stVideo"]');
+          cards.forEach((video) => {
+            video.removeAttribute('controls');
+            video.controls = false;
+            video.muted = true;
+            video.autoplay = true;
+            video.loop = true;
+            video.playsInline = true;
+            video.setAttribute('muted', '');
+            video.setAttribute('autoplay', '');
+            video.setAttribute('loop', '');
+            video.setAttribute('playsinline', '');
+          });
+        };
+        syncPrizeVideos();
+        const observer = new hostWindow.MutationObserver(syncPrizeVideos);
+        observer.observe(hostWindow.document.body, { childList: true, subtree: true });
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
 
     st.markdown("""
     <div class="form-shell">
