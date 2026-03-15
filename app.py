@@ -1073,15 +1073,19 @@ def _image_data_uri(path: str) -> str:
     return f"data:image/{suffix};base64,{encoded}"
 
 
+@st.cache_data(show_spinner=False)
 def _get_video_source(filename: str) -> str:
     """
-    Return a Streamlit static-serving URL for the decorative prize videos.
-    This avoids embedding large base64 blobs in the initial page HTML.
+    Get a video source as a data URI for decorative inline playback.
+    Streamlit's app static handler does not serve mp4 with a video MIME type,
+    so the lightweight preview assets are embedded directly instead.
     """
-    static_video_path = Path(__file__).parent / "static" / filename
-    if not static_video_path.exists():
+    video_path = Path(__file__).parent / "static" / filename
+    if not video_path.exists():
         return ""
-    return f"app/static/{filename}"
+    suffix = video_path.suffix.lower().lstrip(".") or "mp4"
+    encoded = base64.b64encode(video_path.read_bytes()).decode("ascii")
+    return f"data:video/{suffix};base64,{encoded}"
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1256,6 +1260,8 @@ def screen_game():
     sels = st.session_state.selections
     owners = st.session_state.shuffled_owners
     impacts = st.session_state.shuffled_impacts
+    owner_text_by_idx = {item["orig_idx"]: item["text"] for item in owners}
+    impact_text_by_idx = {item["orig_idx"]: item["text"] for item in impacts}
 
     def _next_incomplete_pain() -> int:
         for pain_idx in range(gd.NUM_PAINS):
@@ -1367,8 +1373,8 @@ def screen_game():
         sel_i = sels[i]
         both = sel_i["owner"] is not None and sel_i["impact"] is not None
 
-        owner_text = next((o["text"] for o in owners if o["orig_idx"] == sel_i["owner"]), None)
-        impact_text = next((o["text"] for o in impacts if o["orig_idx"] == sel_i["impact"]), None)
+        owner_text = owner_text_by_idx.get(sel_i["owner"])
+        impact_text = impact_text_by_idx.get(sel_i["impact"])
 
         o_tick = "OK" if owner_text else "-"
         imp_tick = "OK" if impact_text else "-"
@@ -1401,10 +1407,7 @@ def screen_game():
             def _owner_option_label(idx: int | None) -> str:
                 if idx is None:
                     return "Select owner"
-                option = next((o for o in owners if o["orig_idx"] == idx), None)
-                if option is None:
-                    return "Select owner"
-                return option["text"]
+                return owner_text_by_idx.get(idx, "Select owner")
 
             cur_owner_pos = next((k for k, idx in enumerate(owner_indices) if idx == sel_i["owner"]), 0)
             new_owner_idx = st.selectbox(
@@ -1424,7 +1427,6 @@ def screen_game():
                     else i
                 )
                 _mobile_haptic()
-                st.rerun()
             if owner_text:
                 st.markdown(
                     f'<div class="slot-filled" style="background:{color}10;border:1px solid {color}60;border-left:3px solid {color}"><strong>Selected owner</strong>{owner_text}</div>',
@@ -1447,10 +1449,7 @@ def screen_game():
             def _impact_option_label(idx: int | None) -> str:
                 if idx is None:
                     return "Select impact"
-                option = next((imp for imp in impacts if imp["orig_idx"] == idx), None)
-                if option is None:
-                    return "Select impact"
-                return option["text"]
+                return impact_text_by_idx.get(idx, "Select impact")
 
             cur_impact_pos = next((k for k, idx in enumerate(impact_indices) if idx == sel_i["impact"]), 0)
             new_impact_idx = st.selectbox(
@@ -1470,7 +1469,6 @@ def screen_game():
                     else i
                 )
                 _mobile_haptic()
-                st.rerun()
             if impact_text:
                 st.markdown(
                     f'<div class="slot-filled" style="background:{color}10;border:1px solid {color}60;border-left:3px solid {color}"><strong>Selected impact</strong>{impact_text}</div>',
