@@ -1073,10 +1073,11 @@ def _image_data_uri(path: str) -> str:
     return f"data:image/{suffix};base64,{encoded}"
 
 
-def _static_asset_url(filename: str) -> str:
-    base_path = (st.get_option("server.baseUrlPath") or "").strip("/")
-    prefix = f"/{base_path}" if base_path else ""
-    return f"{prefix}/app/static/{filename}"
+@st.cache_data
+def _video_data_uri(path: str, mime_type: str) -> str:
+    video_path = Path(path)
+    encoded = base64.b64encode(video_path.read_bytes()).decode("ascii")
+    return f"data:{mime_type};base64,{encoded}"
 
 
 def _preferred_video_asset(primary_name: str, preview_name: str) -> Path:
@@ -1138,7 +1139,7 @@ def screen_register():
     watch_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Watch</div>"
 
     if laptop_video_mp4.exists():
-        laptop_src = _static_asset_url(laptop_video_mp4.name)
+        laptop_src = _video_data_uri(str(laptop_video_mp4), "video/mp4")
         laptop_video_html = f"""
         <video autoplay loop muted playsinline webkit-playsinline preload="none"
                disablepictureinpicture disableremoteplayback
@@ -1150,7 +1151,7 @@ def screen_register():
         """
 
     if watch_video.exists():
-        watch_src = _static_asset_url(watch_video.name)
+        watch_src = _video_data_uri(str(watch_video), "video/mp4")
         watch_video_html = f"""
         <video autoplay loop muted playsinline webkit-playsinline preload="none"
                disablepictureinpicture disableremoteplayback
