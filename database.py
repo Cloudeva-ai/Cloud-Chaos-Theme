@@ -16,8 +16,10 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import threading
 import time
+import tempfile
 from functools import lru_cache
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,21 +45,125 @@ from sqlalchemy import (
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
 
+from game_data import NUM_PAINS
+
 # ─────────────────────────────────────────────────────────────
 #  ENGINE SETUP
 # ─────────────────────────────────────────────────────────────
-DB_PATH = Path(__file__).parent / "cloud_chaos.db"
-REGISTRATION_BACKUP_PATH = Path(__file__).parent / "player_registrations_backup.xlsx"
-REGISTRATION_BACKUP_CSV_PATH = Path(__file__).parent / "player_registrations_backup.csv"
-REGISTRATION_BACKUP_DIR = Path(__file__).parent / "registration_backups"
+APP_DIR = Path(__file__).parent
+DEFAULT_DATA_DIR_NAME = ".cloud_chaos_data"
+
+
+def _is_writable_directory(path: Path) -> bool:
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        probe_path = path / ".write_test"
+        probe_path.write_text("ok", encoding="ascii")
+        probe_path.unlink(missing_ok=True)
+        return True
+    except OSError:
+        return False
+
+
+def _resolve_data_dir() -> Path:
+    env_dir = os.getenv("CLOUD_CHAOS_DATA_DIR")
+    if env_dir:
+        return Path(env_dir).expanduser().resolve()
+
+    repo_data_dir = APP_DIR / DEFAULT_DATA_DIR_NAME
+    if _is_writable_directory(repo_data_dir):
+        return repo_data_dir
+
+    return (Path(tempfile.gettempdir()) / "cloud_chaos").resolve()
+
+
+DATA_DIR = _resolve_data_dir()
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+LEGACY_DB_PATH = APP_DIR / "cloud_chaos.db"
+LEGACY_DB_WAL_PATH = APP_DIR / "cloud_chaos.db-wal"
+LEGACY_DB_SHM_PATH = APP_DIR / "cloud_chaos.db-shm"
+LEGACY_REGISTRATION_BACKUP_PATH = APP_DIR / "player_registrations_backup.xlsx"
+LEGACY_REGISTRATION_BACKUP_CSV_PATH = APP_DIR / "player_registrations_backup.csv"
+LEGACY_REGISTRATION_BACKUP_DIR = APP_DIR / "registration_backups"
+
+DB_PATH = DATA_DIR / "cloud_chaos.db"
+REGISTRATION_BACKUP_PATH = DATA_DIR / "player_registrations_backup.xlsx"
+REGISTRATION_BACKUP_CSV_PATH = DATA_DIR / "player_registrations_backup.csv"
+REGISTRATION_FAILOVER_PATH = DATA_DIR / "player_registrations_failover.xlsx"
+REGISTRATION_FAILOVER_CSV_PATH = DATA_DIR / "player_registrations_failover.csv"
+REGISTRATION_BACKUP_DIR = DATA_DIR / "registration_backups"
 BACKUP_LOCK = threading.Lock()
 BACKUP_MIN_INTERVAL_SECONDS = 10
 SNAPSHOT_MIN_INTERVAL_SECONDS = 300
 _last_backup_export_at = 0.0
 _last_snapshot_export_at = 0.0
+_last_game_sessions_export_at = 0.0
+
+GAME_SESSIONS_BACKUP_PATH = DATA_DIR / "game_sessions_backup.xlsx"
+GAME_SESSIONS_BACKUP_CSV_PATH = DATA_DIR / "game_sessions_backup.csv"
+SELECTIONS_BACKUP_PATH = DATA_DIR / "game_selections_backup.xlsx"
+SELECTIONS_BACKUP_CSV_PATH = DATA_DIR / "game_selections_backup.csv"
+
+
+def _repair_database() -> None:
+    """Attempt to repair corrupted database files."""
+    # Remove WAL files if they exist (can cause I/O issues)
+    wal_path = DB_PATH.with_suffix(f"{DB_PATH.suffix}-wal")
+    shm_path = DB_PATH.with_suffix(f"{DB_PATH.suffix}-shm")
+    
+    for path in [wal_path, shm_path]:
+        if path.exists():
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
+    
+    # Try to vacuum and repair
+    if DB_PATH.exists():
+        try:
+            import sqlite3
+            conn = sqlite3.connect(str(DB_PATH), timeout=10)
+            conn.execute("PRAGMA integrity_check;")
+            conn.execute("VACUUM;")
+            conn.close()
+        except Exception:
+            # If repair fails, move the corrupted file and start fresh
+            try:
+                backup_path = DB_PATH.with_stem(f"{DB_PATH.stem}_corrupted_{int(time.time())}")
+                shutil.move(str(DB_PATH), str(backup_path))
+            except OSError:
+                pass
+
+
+def _copy_if_missing(source: Path, target: Path) -> None:
+    if source.exists() and not target.exists():
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+
+
+def _migrate_legacy_files() -> None:
+    if DATA_DIR == APP_DIR:
+        return
+
+    _copy_if_missing(LEGACY_DB_PATH, DB_PATH)
+    _copy_if_missing(LEGACY_DB_WAL_PATH, DB_PATH.with_name(f"{DB_PATH.name}-wal"))
+    _copy_if_missing(LEGACY_DB_SHM_PATH, DB_PATH.with_name(f"{DB_PATH.name}-shm"))
+    _copy_if_missing(LEGACY_REGISTRATION_BACKUP_PATH, REGISTRATION_BACKUP_PATH)
+    _copy_if_missing(LEGACY_REGISTRATION_BACKUP_CSV_PATH, REGISTRATION_BACKUP_CSV_PATH)
+
+    if LEGACY_REGISTRATION_BACKUP_DIR.exists() and not REGISTRATION_BACKUP_DIR.exists():
+        shutil.copytree(LEGACY_REGISTRATION_BACKUP_DIR, REGISTRATION_BACKUP_DIR)
+
+
+_migrate_legacy_files()
+
+# Attempt repair before creating engine
+_repair_database()
+
 ENGINE  = create_engine(
     f"sqlite:///{DB_PATH}",
-    connect_args={"check_same_thread": False, "timeout": 30},
+    connect_args={"check_same_thread": False, "timeout": 60},
     echo=False,
 )
 
@@ -65,11 +171,17 @@ ENGINE  = create_engine(
 @event.listens_for(ENGINE, "connect")
 def _set_sqlite_pragmas(dbapi_connection, _connection_record):
     cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA journal_mode=WAL;")
-    cursor.execute("PRAGMA foreign_keys=ON;")
-    cursor.execute("PRAGMA synchronous=FULL;")
-    cursor.execute("PRAGMA busy_timeout=30000;")
-    cursor.close()
+    try:
+        cursor.execute("PRAGMA journal_mode=DELETE;")  # Use DELETE instead of WAL to avoid I/O issues
+        cursor.execute("PRAGMA foreign_keys=ON;")
+        cursor.execute("PRAGMA synchronous=NORMAL;")
+        cursor.execute("PRAGMA busy_timeout=90000;")  # 90 seconds
+        cursor.execute("PRAGMA temp_store=MEMORY;")
+        cursor.execute("PRAGMA cache_size=-64000;")  # 64MB cache
+    except Exception:
+        pass
+    finally:
+        cursor.close()
 
 SessionFactory = sessionmaker(bind=ENGINE, autoflush=False, autocommit=False, expire_on_commit=False)
 
@@ -202,7 +314,18 @@ class Event(Base):
 # ─────────────────────────────────────────────────────────────
 def init_db() -> None:
     """Create all tables if they don't exist. Safe to call on every startup."""
-    Base.metadata.create_all(ENGINE)
+    try:
+        Base.metadata.create_all(ENGINE)
+    except Exception as e:
+        # If creation fails, try to repair and retry once
+        if "disk I/O" in str(e).lower() or "database is locked" in str(e).lower():
+            _repair_database()
+            try:
+                Base.metadata.create_all(ENGINE)
+            except Exception:
+                raise
+        else:
+            raise
 
 
 def _invalidate_read_caches() -> None:
@@ -253,6 +376,58 @@ def _validate_event_payload(payload: str) -> str:
     return clean_payload
 
 
+def _write_df_atomically(df: pd.DataFrame, excel_path: Path, csv_path: Path, *, sheet_name: str) -> None:
+    temp_excel_path = excel_path.with_suffix(".tmp.xlsx")
+    temp_csv_path = csv_path.with_suffix(".tmp.csv")
+    df.to_excel(temp_excel_path, index=False, sheet_name=sheet_name)
+    df.to_csv(temp_csv_path, index=False)
+    os.replace(temp_excel_path, excel_path)
+    os.replace(temp_csv_path, csv_path)
+
+
+def _read_csv_if_exists(csv_path: Path, columns: list[str]) -> pd.DataFrame:
+    if not csv_path.exists():
+        return pd.DataFrame(columns=columns)
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception:
+        return pd.DataFrame(columns=columns)
+    for column in columns:
+        if column not in df.columns:
+            df[column] = None
+    return df[columns]
+
+
+def _record_registration_failover(
+    *,
+    name: str,
+    company: str,
+    email: str,
+    error: str,
+    db_status: str = "failed",
+) -> None:
+    """Persist a registration attempt to Excel/CSV if the database write fails."""
+    columns = ["recorded_at", "name", "company", "email", "db_status", "error"]
+    row = pd.DataFrame([{
+        "recorded_at": _now().isoformat(),
+        "name": name,
+        "company": company,
+        "email": email,
+        "db_status": db_status,
+        "error": error[:500],
+    }], columns=columns)
+
+    with BACKUP_LOCK:
+        existing = _read_csv_if_exists(REGISTRATION_FAILOVER_CSV_PATH, columns)
+        updated = pd.concat([existing, row], ignore_index=True)
+        _write_df_atomically(
+            updated,
+            REGISTRATION_FAILOVER_PATH,
+            REGISTRATION_FAILOVER_CSV_PATH,
+            sheet_name="failover_registrations",
+        )
+
+
 def _export_registration_backup(
     *,
     force: bool = False,
@@ -298,12 +473,12 @@ def _export_registration_backup(
     with BACKUP_LOCK:
         REGISTRATION_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
         if should_write_current:
-            temp_path = REGISTRATION_BACKUP_PATH.with_suffix(".tmp.xlsx")
-            temp_csv_path = REGISTRATION_BACKUP_CSV_PATH.with_suffix(".tmp.csv")
-            df.to_excel(temp_path, index=False, sheet_name="registrations")
-            df.to_csv(temp_csv_path, index=False)
-            os.replace(temp_path, REGISTRATION_BACKUP_PATH)
-            os.replace(temp_csv_path, REGISTRATION_BACKUP_CSV_PATH)
+            _write_df_atomically(
+                df,
+                REGISTRATION_BACKUP_PATH,
+                REGISTRATION_BACKUP_CSV_PATH,
+                sheet_name="registrations",
+            )
             _last_backup_export_at = time.monotonic()
 
         if should_write_snapshot:
@@ -315,6 +490,89 @@ def _export_registration_backup(
             _last_snapshot_export_at = time.monotonic()
 
 
+def _export_game_sessions_backup(*, force: bool = False) -> None:
+    """
+    Export game sessions and selections to Excel/CSV for emergency fallback.
+    This ensures data is stored outside the database on Streamlit Cloud.
+    """
+    global _last_game_sessions_export_at
+    
+    now = time.monotonic()
+    if not force and (now - _last_game_sessions_export_at) < BACKUP_MIN_INTERVAL_SECONDS:
+        return  # Rate-limit exports
+    
+    try:
+        with SessionFactory() as db:
+            # Export game sessions
+            sessions = db.execute(text("""
+                SELECT
+                    gs.id AS session_id,
+                    p.id AS player_id,
+                    p.name,
+                    p.company,
+                    p.email,
+                    gs.score,
+                    gs.time_used,
+                    gs.timed_out,
+                    gs.is_perfect,
+                    gs.completed_at
+                FROM game_sessions gs
+                JOIN players p ON p.id = gs.player_id
+                ORDER BY gs.completed_at DESC
+            """)).mappings().all()
+            
+            sessions_df = pd.DataFrame([dict(row) for row in sessions])
+            if sessions_df.empty:
+                sessions_df = pd.DataFrame(columns=[
+                    "session_id", "player_id", "name", "company", "email",
+                    "score", "time_used", "timed_out", "is_perfect", "completed_at"
+                ])
+            
+            # Export selections (per-card answers)
+            selections = db.execute(text("""
+                SELECT
+                    s.id,
+                    s.session_id,
+                    s.pain_idx,
+                    s.owner_orig_idx,
+                    s.impact_orig_idx,
+                    s.owner_correct,
+                    s.impact_correct,
+                    s.both_correct
+                FROM selections s
+                ORDER BY s.session_id, s.pain_idx
+            """)).mappings().all()
+            
+            selections_df = pd.DataFrame([dict(row) for row in selections])
+            if selections_df.empty:
+                selections_df = pd.DataFrame(columns=[
+                    "id", "session_id", "pain_idx", "owner_orig_idx",
+                    "impact_orig_idx", "owner_correct", "impact_correct", "both_correct"
+                ])
+    
+        with BACKUP_LOCK:
+            # Write sessions
+            _write_df_atomically(
+                sessions_df,
+                GAME_SESSIONS_BACKUP_PATH,
+                GAME_SESSIONS_BACKUP_CSV_PATH,
+                sheet_name="sessions",
+            )
+            
+            # Write selections
+            _write_df_atomically(
+                selections_df,
+                SELECTIONS_BACKUP_PATH,
+                SELECTIONS_BACKUP_CSV_PATH,
+                sheet_name="selections",
+            )
+            
+            _last_game_sessions_export_at = time.monotonic()
+    except Exception:
+        # Silently fail; backup should never block game flow
+        pass
+
+
 def upsert_player(name: str, company: str, email: str) -> tuple[Player, bool]:
     """
     Insert a new player or update last_seen + name/company if the email already
@@ -322,34 +580,63 @@ def upsert_player(name: str, company: str, email: str) -> tuple[Player, bool]:
     """
     clean_name, clean_company, clean_email = _normalize_registration_fields(name, company, email)
 
-    with SessionFactory() as db:
-        player = db.scalar(select(Player).where(Player.email == clean_email))
-        is_new = player is None
-
-        if is_new:
-            player = Player(name=clean_name, company=clean_company, email=clean_email)
-            db.add(player)
-        else:
-            player.name = clean_name
-            player.company = clean_company
-            player.last_seen = _now()
-
+    # Retry logic for transient I/O errors
+    max_retries = 3
+    for attempt in range(max_retries):
         try:
-            db.commit()
-        except IntegrityError:
-            db.rollback()
-            player = db.scalar(select(Player).where(Player.email == clean_email))
-            if player is None:
-                raise
-            player.name = clean_name
-            player.company = clean_company
-            player.last_seen = _now()
-            db.commit()
-            is_new = False
+            with SessionFactory() as db:
+                player = db.scalar(select(Player).where(Player.email == clean_email))
+                is_new = player is None
 
-        _export_registration_backup(include_snapshot=True)
-        _invalidate_read_caches()
-        return player, is_new
+                if is_new:
+                    player = Player(name=clean_name, company=clean_company, email=clean_email)
+                    db.add(player)
+                else:
+                    player.name = clean_name
+                    player.company = clean_company
+                    player.last_seen = _now()
+
+                try:
+                    db.commit()
+                except IntegrityError:
+                    db.rollback()
+                    player = db.scalar(select(Player).where(Player.email == clean_email))
+                    if player is None:
+                        raise
+                    player.name = clean_name
+                    player.company = clean_company
+                    player.last_seen = _now()
+                    db.commit()
+                    is_new = False
+
+                try:
+                    _export_registration_backup(force=True, include_snapshot=True)
+                except Exception as backup_exc:
+                    _record_registration_failover(
+                        name=clean_name,
+                        company=clean_company,
+                        email=clean_email,
+                        error=f"Registration saved to database, but backup refresh failed: {backup_exc}",
+                        db_status="db_saved_backup_failed",
+                    )
+                _invalidate_read_caches()
+                return player, is_new
+        except Exception as e:
+            # Retry on I/O errors
+            if attempt < max_retries - 1 and ("disk I/O" in str(e).lower() or "database is locked" in str(e).lower()):
+                import time
+                time.sleep(0.5 * (2 ** attempt))  # Exponential backoff: 0.5s, 1s, 2s
+                continue
+            try:
+                _record_registration_failover(
+                    name=clean_name,
+                    company=clean_company,
+                    email=clean_email,
+                    error=str(e),
+                )
+            except Exception:
+                pass
+            raise
 
 
 def log_event(player_id: Optional[int], event_type: str, payload: str = "") -> None:
@@ -372,14 +659,14 @@ def save_game_session(
     score:      int,
     time_used:  int,
     timed_out:  bool,
-    selections: dict[int, dict[str, Optional[int]]],
+    selections: dict[int, dict[str, Optional[bool]]],
 ) -> GameSession:
     """
     Persist a completed game session with per-pain selections.
     Also updates the player's aggregate stats (total_plays, best_score, best_time).
 
     `selections` format:
-        { pain_idx: {"owner": orig_idx | None, "impact": orig_idx | None} }
+        { pain_idx: {"answer": bool | None, "is_correct": bool | None} }
     """
     if score < 0:
         raise ValueError("Score cannot be negative.")
@@ -392,52 +679,68 @@ def save_game_session(
             raise ValueError("Pain index cannot be negative.")
         if not isinstance(selection, dict):
             raise ValueError("Each selection must be a dictionary.")
-        if "owner" not in selection or "impact" not in selection:
-            raise ValueError("Each selection must include owner and impact keys.")
+        if "answer" not in selection:
+            raise ValueError("Each selection must include an answer key.")
 
-    with SessionFactory() as db:
-        player = db.get(Player, player_id)
-        if player is None:
-            raise ValueError(f"Unknown player id: {player_id}")
+    # Retry logic for transient I/O errors
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            with SessionFactory() as db:
+                player = db.get(Player, player_id)
+                if player is None:
+                    raise ValueError(f"Unknown player id: {player_id}")
 
-        session = GameSession(
-            player_id=player_id,
-            score=score,
-            time_used=time_used,
-            timed_out=timed_out,
-            is_perfect=(score == 5),
-        )
-        db.add(session)
-        db.flush()  # get session.id before inserting children
+                session = GameSession(
+                    player_id=player_id,
+                    score=score,
+                    time_used=time_used,
+                    timed_out=timed_out,
+                    is_perfect=(score == NUM_PAINS),
+                )
+                db.add(session)
+                db.flush()  # get session.id before inserting children
 
-        for pain_idx, sel in selections.items():
-            owner_pick   = sel.get("owner")
-            impact_pick  = sel.get("impact")
-            owner_ok     = owner_pick  == pain_idx
-            impact_ok    = impact_pick == pain_idx
-            db.add(Selection(
-                session_id      = session.id,
-                pain_idx        = pain_idx,
-                owner_orig_idx  = owner_pick,
-                impact_orig_idx = impact_pick,
-                owner_correct   = owner_ok,
-                impact_correct  = impact_ok,
-                both_correct    = owner_ok and impact_ok,
-            ))
+                for pain_idx, sel in selections.items():
+                    answer = sel.get("answer")
+                    is_correct = bool(sel.get("is_correct"))
+                    db.add(Selection(
+                        session_id      = session.id,
+                        pain_idx        = pain_idx,
+                        owner_orig_idx  = None if answer is None else int(answer),
+                        impact_orig_idx = None if answer is None else int(answer),
+                        owner_correct   = is_correct,
+                        impact_correct  = is_correct,
+                        both_correct    = is_correct,
+                    ))
 
-        # Update player aggregate stats
-        player.total_plays += 1
-        player.last_seen = _now()
-        if score > player.best_score or (
-            score == player.best_score and
-            (player.best_time is None or time_used < player.best_time)
-        ):
-            player.best_score = score
-            player.best_time = time_used
+                # Update player aggregate stats
+                player.total_plays += 1
+                player.last_seen = _now()
+                if score > player.best_score or (
+                    score == player.best_score and
+                    (player.best_time is None or time_used < player.best_time)
+                ):
+                    player.best_score = score
+                    player.best_time = time_used
 
-        db.commit()
-        _invalidate_read_caches()
-        return session
+                db.commit()
+                _invalidate_read_caches()
+                
+                # Export to Excel as backup (don't block if it fails)
+                try:
+                    _export_game_sessions_backup(force=True)
+                except Exception:
+                    pass
+                
+                return session
+        except Exception as e:
+            # Retry on I/O errors
+            if attempt < max_retries - 1 and ("disk I/O" in str(e).lower() or "database is locked" in str(e).lower()):
+                import time
+                time.sleep(0.5 * (2 ** attempt))  # Exponential backoff: 0.5s, 1s, 2s
+                continue
+            raise
 
 
 # ─────────────────────────────────────────────────────────────
@@ -546,7 +849,7 @@ def get_stats() -> dict[str, Any]:
     Aggregate stats for the register screen and admin dashboard:
      - total unique players
      - total sessions played
-     - perfect scores (5/5) count
+     - perfect scores (NUM_PAINS/NUM_PAINS) count
      - average score
      - per-pain accuracy rates
     """

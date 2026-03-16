@@ -12,15 +12,34 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import time
 from pathlib import Path
 
 import streamlit as st
 import streamlit.components.v1 as components
 
+
+try:
+    secret_data_dir = st.secrets.get("CLOUD_CHAOS_DATA_DIR")
+except Exception:
+    secret_data_dir = None
+
+if secret_data_dir and not os.getenv("CLOUD_CHAOS_DATA_DIR"):
+    os.environ["CLOUD_CHAOS_DATA_DIR"] = str(secret_data_dir)
+
 import database as db
 import game_data as gd
 import game_engine as ge
+
+APP_DIR = Path(__file__).parent
+LOGO_PATH = APP_DIR / "Logo" / "CloudEva_Logo_transparent.png"
+LAPTOP_IMAGE_PATH = APP_DIR / "static" / "laptop.jpeg"
+WATCH_IMAGE_PATH = APP_DIR / "static" / "smartwatch.jpeg"
+PRIZE_CARD_STYLE = (
+    "flex:1;background:rgba(255,255,255,0.92);border:1px solid rgba(15,23,42,.08);"
+    "border-radius:12px;overflow:hidden;display:flex;flex-direction:column;align-items:center;"
+)
 
 # ─────────────────────────────────────────────────────────────
 #  PAGE CONFIG
@@ -391,26 +410,46 @@ div[data-testid="stForm"] {
   backdrop-filter: blur(20px) saturate(145%);
   -webkit-backdrop-filter: blur(20px) saturate(145%);
 }
-.prize-glow {
-  position: absolute; inset: 0;
-  background: radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.5) 0%, transparent 70%);
-  pointer-events: none;
-}
 .prize-top-label { font-size: 11px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: #77c4a5; margin-bottom: 12px; }
-.prize-items { display: flex; justify-content: center; gap: 10px; margin-bottom: 10px; flex-wrap: nowrap; }
-.prize-item {
-  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
-  background: rgba(255,255,255,0.70); border: 1px solid rgba(6,194,172,0.16);
-  border-radius: 12px; padding: 12px 8px;
+.prize-card {
+  transform: translate3d(0, 0, 0);
+  transform-origin: center center;
+  animation: prizeDrift 6s ease-in-out infinite;
+  transition: transform .28s ease, box-shadow .28s ease, border-color .28s ease;
+  will-change: transform;
 }
-.prize-icon { font-size: 26px; line-height: 1; }
-.prize-name { font-size: 12px; font-weight: 700; color: var(--text); }
-.prize-qty {
-  font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
-  color: var(--accent); background: rgba(6,194,172,0.14);
-  padding: 2px 7px; border-radius: 20px; letter-spacing: 1px;
+.prize-card:nth-child(2) { animation-delay: .45s; }
+.prize-card:hover {
+  transform: translate3d(0, -6px, 0) scale(1.015);
+  box-shadow: 0 16px 30px rgba(2,60,87,0.16);
+  border-color: rgba(6,194,172,0.30) !important;
 }
-.prize-sub { font-size: 11px; color: var(--muted); line-height: 1.4; font-weight: 500; }
+.prize-card:active { transform: translate3d(0, -2px, 0) scale(.995); }
+.prize-media {
+  overflow: hidden;
+  transform: translateZ(0);
+}
+.prize-media img {
+  animation: prizeZoom 7.5s ease-in-out infinite;
+  transition: transform .4s ease, filter .4s ease;
+  will-change: transform;
+}
+.prize-card:nth-child(2) .prize-media img { animation-delay: .6s; }
+.prize-card:hover .prize-media img {
+  transform: scale(1.04);
+  filter: saturate(1.04) contrast(1.02);
+}
+
+@media (max-width: 640px) {
+  details [data-testid="stHorizontalBlock"] {
+    flex-wrap: nowrap !important;
+    gap: 0.55rem !important;
+  }
+  details [data-testid="column"] {
+    min-width: 0 !important;
+    flex: 1 1 0 !important;
+  }
+}
 
 /* ── Game topbar ── */
 .topbar {
@@ -531,6 +570,25 @@ div[data-testid="stForm"] {
   backdrop-filter: blur(14px) saturate(135%);
   -webkit-backdrop-filter: blur(14px) saturate(135%);
 }
+.decision-strip {
+  margin-top: 12px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.decision-strip .stButton > button {
+  min-height: 48px !important;
+  padding: 0 !important;
+  border-radius: 12px !important;
+  font-size: 24px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0 !important;
+  width: 100% !important;
+}
 .answer-hint {
   font-size: 11px;
   color: var(--muted);
@@ -587,6 +645,47 @@ div[data-testid="stForm"] {
 }
 .eva-lbl { font-size: 9px; letter-spacing: 3px; text-transform: uppercase; color: #77c4a5; margin-bottom: 6px; font-weight: 800; }
 .eva-txt { font-size: 13px; line-height: 1.7; color: #d6f3ef; }
+.final-step-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 12px 0 14px;
+  padding: 14px;
+  border-radius: calc(var(--radius) - 2px);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.16), rgba(4,112,162,0.22)),
+    radial-gradient(circle at 18% 20%, rgba(236,250,247,0.16), transparent 26%);
+  border: 1px solid rgba(255,255,255,0.22);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.18);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+.final-step-mascot {
+  width: 78px;
+  height: 78px;
+  min-width: 78px;
+  border-radius: 18px;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 18px rgba(0,0,0,0.18));
+}
+.final-step-copy {
+  min-width: 0;
+  text-align: left;
+}
+.final-step-kicker {
+  font-size: 10px;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  color: #77c4a5;
+  font-weight: 800;
+  margin-bottom: 5px;
+}
+.final-step-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  font-weight: 700;
+}
 
 /* ── Result title / sub ── */
 .result-title { font-size: clamp(28px, 8vw, 44px); font-weight: 800; text-align: center; color: var(--text); letter-spacing: -0.8px; }
@@ -740,7 +839,7 @@ div[data-testid="stForm"] {
   box-shadow: 0 0 0 3px rgba(6,194,172,0.14) !important;
   outline: none !important;
 }
-.stTextInput > div > div > input::placeholder { color: #335369 !important; }
+.stTextInput > div > div > input::placeholder { color: rgba(51,83,105,0.48) !important; }
 .stTextInput label { color: #00111f !important; font-size: 11px !important; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700 !important; }
 
 /* Selectboxes — large touch targets */
@@ -786,10 +885,10 @@ div[data-testid="stForm"] {
   padding: 14px 18px;
   border-radius: 999px;
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.18), rgba(4,112,162,0.26)),
-    radial-gradient(circle at 18% 28%, rgba(236,250,247,0.16), transparent 28%),
-    radial-gradient(circle at 78% 24%, rgba(6,194,172,0.16), transparent 24%);
-  border: 1px solid rgba(255,255,255,0.24);
+    linear-gradient(135deg, rgba(6,194,172,0.14), rgba(4,112,162,0.20)),
+    radial-gradient(circle at 18% 28%, rgba(236,250,247,0.18), transparent 28%),
+    radial-gradient(circle at 78% 24%, rgba(6,194,172,0.18), transparent 24%);
+  border: 2px solid rgba(6,194,172,0.4);
   color: #ffffff !important;
   text-decoration: none !important;
   font-family: 'Manrope', sans-serif;
@@ -797,14 +896,95 @@ div[data-testid="stForm"] {
   font-weight: 800;
   letter-spacing: 0.2px;
   line-height: 1.2;
-  box-shadow: 0 14px 28px rgba(0,17,31,0.12), inset 0 1px 0 rgba(255,255,255,0.16);
+  box-shadow: 
+    0 0 20px rgba(6,194,172,0.2),
+    0 14px 28px rgba(0,17,31,0.12), 
+    inset 0 1px 0 rgba(255,255,255,0.16);
   backdrop-filter: blur(18px) saturate(140%);
   -webkit-backdrop-filter: blur(18px) saturate(140%);
   margin: 0 0 12px;
+  position: relative;
+  overflow: hidden;
+  animation: ctaGlow 3s ease-in-out infinite, ctaLift 2.5s ease-in-out infinite;
+  transition: all 0.3s ease;
+}
+.cta-link::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, transparent 30%, rgba(29,248,222,0.1) 50%, transparent 70%);
+  animation: ctaShimmer 2s ease-in-out infinite;
+  pointer-events: none;
+}
+.cta-link::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 999px;
+  background: conic-gradient(
+    from 0deg,
+    rgba(6,194,172,0.4),
+    rgba(119,196,165,0.3),
+    rgba(29,248,222,0.2),
+    rgba(6,194,172,0.4)
+  );
+  animation: ctaBorderGlow 4s linear infinite;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.6;
+}
+.cta-link > * {
+  position: relative;
+  z-index: 1;
+}
+.cta-link::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  animation: ctaShine 2.5s ease-in-out infinite;
 }
 .cta-link:hover {
-  border-color: rgba(255,255,255,0.34);
-  box-shadow: 0 18px 34px rgba(0,17,31,0.16), inset 0 1px 0 rgba(255,255,255,0.18);
+  border-color: rgba(6,194,172,0.8);
+  box-shadow: 
+    0 0 30px rgba(6,194,172,0.4),
+    0 24px 48px rgba(6,194,172,0.2), 
+    inset 0 1px 0 rgba(255,255,255,0.20);
+  transform: translateY(-2px);
+  animation-play-state: paused;
+}
+@keyframes ctaGlow {
+  0%, 100% { 
+    box-shadow: 
+      0 0 20px rgba(6,194,172,0.2),
+      0 14px 28px rgba(0,17,31,0.12), 
+      inset 0 1px 0 rgba(255,255,255,0.16);
+  }
+  50% { 
+    box-shadow: 
+      0 0 40px rgba(6,194,172,0.4),
+      0 20px 40px rgba(6,194,172,0.15), 
+      inset 0 1px 0 rgba(255,255,255,0.16);
+  }
+}
+@keyframes ctaLift {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+@keyframes ctaShimmer {
+  0% { transform: translateX(-100%); opacity: 0; }
+  50% { opacity: 1; }
+  100% { transform: translateX(100%); opacity: 0; }
+}
+@keyframes ctaBorderGlow {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 /* Secondary */
 .stButton > button[kind="secondary"] {
@@ -893,19 +1073,18 @@ details > summary {
 /* ── Animations ── */
 @keyframes slideUp   { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
 @keyframes float     { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-9px)} }
-@keyframes shimmer   { 0%{background-position:-200% center} 100%{background-position:200% center} }
 @keyframes popIn     { 0%{opacity:0;transform:scale(.7)} 70%{transform:scale(1.08)} 100%{opacity:1;transform:scale(1)} }
 @keyframes fadeScale { 0%{opacity:0;transform:scale(.95)} 100%{opacity:1;transform:scale(1)} }
-@keyframes ringFill  { from{stroke-dashoffset:var(--circ)} to{stroke-dashoffset:var(--gap)} }
 @keyframes scorePop  { 0%{opacity:0;transform:scale(0.5) rotate(-10deg)} 70%{transform:scale(1.15)} 100%{opacity:1;transform:scale(1)} }
 @keyframes bgShift   { 0%{background-position:0% 0%} 50%{background-position:100% 40%} 100%{background-position:20% 100%} }
 @keyframes bgFloat   { 0%{transform:translate3d(0,0,0) scale(1)} 50%{transform:translate3d(-1.5%,1.2%,0) scale(1.03)} 100%{transform:translate3d(1.5%,-1%,0) scale(1.01)} }
+@keyframes prizeDrift { 0%,100%{transform:translate3d(0,0,0) rotate(0deg)} 25%{transform:translate3d(0,-4px,0) rotate(-.6deg)} 50%{transform:translate3d(0,-7px,0) rotate(.4deg)} 75%{transform:translate3d(0,-3px,0) rotate(-.35deg)} }
+@keyframes prizeZoom { 0%,100%{transform:scale(1)} 50%{transform:scale(1.035)} }
 @keyframes chaosTilt { 0%,100%{transform:rotate(0deg) scale(1)} 18%{transform:rotate(-1deg) scale(1.01)} 42%{transform:rotate(1deg) scale(1.015)} 64%{transform:rotate(-0.8deg) scale(0.995)} }
 @keyframes cloudDrift { 0%,100%{transform:translateX(0)} 30%{transform:translateX(-2px)} 60%{transform:translateX(2px)} }
 @keyframes chaosJolt { 0%,100%{transform:translate(0,0)} 18%{transform:translate(-1px,1px)} 22%{transform:translate(2px,-1px)} 48%{transform:translate(-2px,0)} 52%{transform:translate(1px,1px)} 74%{transform:translate(0,-1px)} }
 @keyframes chaosSliceA { 0%,100%{transform:translate(-2px,1px)} 30%{transform:translate(-4px,1px)} 60%{transform:translate(-1px,-1px)} }
 @keyframes chaosSliceB { 0%,100%{transform:translate(2px,-1px)} 28%{transform:translate(4px,-2px)} 64%{transform:translate(1px,1px)} }
-
 /* Card entrance */
 .element-container { animation: slideUp .38s cubic-bezier(.22,1,.36,1) both; }
 .element-container:nth-child(1){animation-delay:.04s}
@@ -926,16 +1105,6 @@ details > summary {
 details > summary:hover {
   background: var(--s2) !important;
   border-radius: var(--radius) !important;
-}
-
-/* Prize banner shimmer */
-.prize-banner::after {
-  content:'';
-  position:absolute; inset:0;
-  background: linear-gradient(120deg,transparent 30%,rgba(255,255,255,.4) 50%,transparent 70%);
-  background-size:200% auto;
-  animation: shimmer 3s linear infinite;
-  pointer-events:none; border-radius:var(--radius);
 }
 
 /* Floating emojis */
@@ -1010,9 +1179,8 @@ def _init_state():
     defaults = {
         "screen":           "register",
         "player":           None,
-        "shuffled_owners":  [],
-        "shuffled_impacts": [],
-        "selections":       {i: {"owner": None, "impact": None} for i in range(gd.NUM_PAINS)},
+        "game_cards":       [],
+        "selections":       {i: {"answer": None, "is_correct": None} for i in range(gd.NUM_PAINS)},
         "active_pain":      0,
         "game_start_time":  None,
         "time_left":        gd.GAME_DURATION,
@@ -1073,16 +1241,30 @@ def _image_data_uri(path: str) -> str:
     return f"data:image/{suffix};base64,{encoded}"
 
 
-def _get_video_source(filename: str) -> str:
+def _image_markup(path: Path, alt: str, *, height_px: int = 140) -> str:
+    if not path.exists():
+        fallback = alt.replace(" prize", "")
+        return (
+            f"<div style='height:{height_px}px;display:flex;align-items:center;"
+            f"justify-content:center;color:var(--muted)'>{fallback}</div>"
+        )
+    image_src = _image_data_uri(str(path))
+    return (
+        f'<img src="{image_src}" alt="{alt}" '
+        f'style="width:100%;height:{height_px}px;object-fit:cover;display:block;background:#fff;">'
+    )
+
+
+def _prize_card_html(media_html: str, label: str, winners_text: str) -> str:
+    return f"""
+    <div class="prize-card" style="{PRIZE_CARD_STYLE}">
+      <div class="prize-media" style="width:100%">{media_html}</div>
+      <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#335369;padding:10px 0 4px;text-align:center">{label}</div>
+      <div style="font-size:12px;font-weight:700;color:#00111f;padding-bottom:10px">{winners_text}</div>
+    </div>
     """
-    Get video source from the main files in Videos/ as a data URI.
-    """
-    video_path = Path(__file__).parent / "Videos" / filename
-    if not video_path.exists():
-        return ""
-    suffix = video_path.suffix.lower().lstrip(".") or "mp4"
-    encoded = base64.b64encode(video_path.read_bytes()).decode("ascii")
-    return f"data:video/{suffix};base64,{encoded}"
+
+
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1093,12 +1275,9 @@ def screen_register():
         stats = db.get_stats()
     except Exception:
         stats = {"total_players": 0, "total_sessions": 0}
-        st.warning("Live stats are temporarily unavailable. You can still register and play.")
 
-    import os as _os
-    _logo_path = _os.path.join(_os.path.dirname(__file__), "Logo", "CloudEva_Logo_transparent.png")
-    if _os.path.exists(_logo_path):
-        logo_src = _image_data_uri(_logo_path)
+    if LOGO_PATH.exists():
+        logo_src = _image_data_uri(str(LOGO_PATH))
         st.markdown(
             f"""
             <div style="text-align:center;margin:0 auto 4px;">
@@ -1122,39 +1301,22 @@ def screen_register():
       <div class="hero-title"><span class="chaos-word">CLOUD</span> <span class="chaos-word" data-text="CHAOS">CHAOS</span></div>
       <div class="hero-accent-line"></div>
       <p class="hero-sub">
-        5 cloud pain points<br>
-        Match who owns it &amp; what it costs<br>
+        Read the signal. Beat the clock.<br>
+        Right or wrong, every call counts<br>
         <strong style="color:#ffffff;font-weight:800">90 seconds. GO.</strong>
       </p>
     </div>
     """, unsafe_allow_html=True)
 
-    # Get video sources
-    laptop_src = _get_video_source("Laptop_3d.mp4")
-    watch_src = _get_video_source("SmartWatch_3d.mp4")
-
-    # Video HTML - simple & reliable format
-    laptop_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Laptop</div>"
-    watch_video_html = "<div style='height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted)'>Smartwatch</div>"
-    if laptop_src:
-        laptop_video_html = f"""<video autoplay loop muted playsinline style="width:100%;height:140px;object-fit:cover;display:block;background:#000;" crossorigin="anonymous"><source src="{laptop_src}" type="video/mp4"></video>"""
-    if watch_src:
-        watch_video_html = f"""<video autoplay loop muted playsinline style="width:100%;height:140px;object-fit:cover;display:block;background:#000;" crossorigin="anonymous"><source src="{watch_src}" type="video/mp4"></video>"""
+    laptop_media_html = _image_markup(LAPTOP_IMAGE_PATH, "Laptop prize")
+    watch_media_html = _image_markup(WATCH_IMAGE_PATH, "Smartwatch prize")
 
     st.markdown(f"""
     <div class="prize-banner">
       <div class="prize-top-label">Prize Pool</div>
       <div style="display:flex;gap:8px;margin-bottom:6px">
-        <div style="flex:1;background:rgba(255,255,255,0.92);border:1px solid rgba(15,23,42,.08);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;align-items:center;">
-          <div style="width:100%">{laptop_video_html}</div>
-          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#335369;padding:10px 0 4px;text-align:center">Laptop</div>
-          <div style="font-size:12px;font-weight:700;color:#00111f;padding-bottom:10px">1 winner</div>
-        </div>
-        <div style="flex:1;background:rgba(255,255,255,0.92);border:1px solid rgba(15,23,42,.08);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;align-items:center;">
-          <div style="width:100%">{watch_video_html}</div>
-          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#335369;padding:10px 0 4px;text-align:center">Smartwatch</div>
-          <div style="font-size:12px;font-weight:700;color:#00111f;padding-bottom:10px">3 winners</div>
-        </div>
+        {_prize_card_html(laptop_media_html, "Laptop", "1 winner")}
+        {_prize_card_html(watch_media_html, "Smartwatch", "3 winners")}
       </div>
     </div>
     """, unsafe_allow_html=True)
@@ -1170,9 +1332,9 @@ def screen_register():
 
     # Registration Form
     with st.form("register_form", clear_on_submit=False):
-        name    = st.text_input("Your Name",    placeholder="vamsi krishna",                 key="reg_name")
-        company = st.text_input("Company",      placeholder="rapyder cloud solutions",       key="reg_company")
-        email   = st.text_input("Work Email",   placeholder="vamsikrishna@rapyder.com",      key="reg_email")
+        name    = st.text_input("Your Name",    placeholder="your name",                     key="reg_name")
+        company = st.text_input("Company",      placeholder="company name",                  key="reg_company")
+        email   = st.text_input("Work Email",   placeholder="company mail id",               key="reg_email")
         submitted = st.form_submit_button(
             "Start the Challenge →",
             use_container_width=True,
@@ -1188,14 +1350,23 @@ def screen_register():
             try:
                 with st.spinner("Saving your registration..."):
                     player, _ = db.upsert_player(name, company, email)
+                    cards = gd.get_shuffled_cards()
+            except ValueError as e:
+                _toast(str(e), None)
+                st.error(str(e))
+            except Exception as e:
+                _toast("Registration could not be saved right now.", None)
+                st.error(f"Registration could not be saved right now: {e}")
+            else:
+                try:
                     db.log_event(player.id, "game_start", json.dumps({"company": company}))
-                    owners, impacts = gd.get_shuffled_pools()
+                except Exception:
+                    pass
                 st.session_state.update({
                     "player":           {"id": player.id, "name": player.name,
                                          "company": player.company, "email": player.email},
-                    "shuffled_owners":  owners,
-                    "shuffled_impacts": impacts,
-                    "selections":       {i: {"owner": None, "impact": None} for i in range(gd.NUM_PAINS)},
+                    "game_cards":       cards,
+                    "selections":       {i: {"answer": None, "is_correct": None} for i in range(gd.NUM_PAINS)},
                     "active_pain":      0,
                     "game_start_time":  time.time(),
                     "time_left":        gd.GAME_DURATION,
@@ -1205,38 +1376,12 @@ def screen_register():
                 })
                 _mobile_haptic()
                 go("game")
-            except ValueError as e:
-                _toast(str(e), None)
-                st.error(str(e))
-            except Exception:
-                _toast("Registration could not be saved right now.", None)
-                st.error("Registration could not be saved right now. Please try again.")
 
-    # Stats row
-    st.markdown(f"""
-    <div class="stats-row">
-      <div class="stat">
-        <div class="stat-num">5×2</div>
-        <div class="stat-label">Matrix</div>
-      </div>
-      <div class="stat">
-        <div class="stat-num">90s</div>
-        <div class="stat-label">Clock</div>
-      </div>
-      <div class="stat">
-        <div class="stat-num">{stats['total_players']}</div>
-        <div class="stat-label">Players</div>
-      </div>
-      <div class="stat">
-        <div class="stat-num">{stats['total_sessions']}</div>
-        <div class="stat-label">Plays</div>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
 
-    st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
     if st.button("🏆  View Leaderboard", use_container_width=True, key="reg_lb_btn"):
         go("leaderboard")
+    st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1255,26 +1400,37 @@ def screen_game():
 
     player = st.session_state.player
     sels = st.session_state.selections
-    owners = st.session_state.shuffled_owners
-    impacts = st.session_state.shuffled_impacts
+    cards = st.session_state.game_cards or gd.get_shuffled_cards()
+    st.session_state.game_cards = cards
+    start_time = st.session_state.game_start_time or time.time()
 
-    def _next_incomplete_pain() -> int:
-        for pain_idx in range(gd.NUM_PAINS):
-            sel = st.session_state.selections[pain_idx]
-            if sel["owner"] is None or sel["impact"] is None:
-                return pain_idx
+    def _next_incomplete_card() -> int:
+        for display_idx, card in enumerate(cards):
+            if st.session_state.selections[card["orig_idx"]]["answer"] is None:
+                return display_idx
         return gd.NUM_PAINS - 1
+
+    def _update_answer(card_idx: int, answer: bool) -> None:
+        card = cards[card_idx]
+        is_correct = answer == card["is_right"]
+        st.session_state.selections[card["orig_idx"]] = {
+            "answer": answer,
+            "is_correct": is_correct,
+        }
+        st.session_state.active_pain = _next_incomplete_card()
+        _mobile_haptic()
+        st.rerun()
 
     active_pain = st.session_state.get("active_pain", 0)
     if active_pain < 0 or active_pain >= gd.NUM_PAINS:
-        active_pain = _next_incomplete_pain()
+        active_pain = _next_incomplete_card()
         st.session_state.active_pain = active_pain
 
-    elapsed = time.time() - (st.session_state.game_start_time or time.time())
+    elapsed = time.time() - start_time
     time_left = max(0, int(gd.GAME_DURATION - elapsed))
     st.session_state.time_left = time_left
 
-    filled = sum(1 for s in sels.values() if s["owner"] is not None and s["impact"] is not None)
+    filled = sum(1 for s in sels.values() if s["answer"] is not None)
     initial = player["name"][0].upper()
     danger_cls = "danger" if time_left <= 15 else ""
     timer_pct = time_left / gd.GAME_DURATION
@@ -1293,7 +1449,7 @@ def screen_game():
         <div class="timer-lbl">SEC LEFT</div>
         <div id="cc-timer-num" class="timer-num {danger_cls}">{time_left}</div>
       </div>
-      <div class="score-chip">{filled}<span style="font-size:11px;opacity:.6">/5</span></div>
+      <div class="score-chip">{filled}<span style="font-size:11px;opacity:.6">/{gd.NUM_PAINS}</span></div>
     </div>
     <div style="height:5px;border-radius:3px;background:rgba(2,60,87,0.10);overflow:hidden;margin-bottom:12px">
       <div id="cc-timer-fill" style="height:100%;width:{int(timer_pct*100)}%;background:{bar_color};
@@ -1301,7 +1457,7 @@ def screen_game():
     </div>
     """, unsafe_allow_html=True)
 
-    deadline_ms = int(((st.session_state.game_start_time or time.time()) + gd.GAME_DURATION) * 1000)
+    deadline_ms = int((start_time + gd.GAME_DURATION) * 1000)
     components.html(
         f"""
         <script>
@@ -1349,146 +1505,80 @@ def screen_game():
     )
 
     dots = "".join(
-        f'<div class="p-dot {"done" if sels[i]["owner"] is not None and sels[i]["impact"] is not None else ""}"></div>'
-        for i in range(gd.NUM_PAINS)
+        f'<div class="p-dot {"done" if sels[card["orig_idx"]]["answer"] is not None else ""}"></div>'
+        for card in cards
     )
     st.markdown(f"""
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
       <div class="dots-row" style="margin:0;flex:1">{dots}</div>
-      <div style="font-size:11px;color:var(--muted);white-space:nowrap">{filled} of 5 matched</div>
+      <div style="font-size:11px;color:var(--muted);white-space:nowrap">{filled} of {gd.NUM_PAINS} answered</div>
     </div>
     <div class="instructions">
-      Tap a pain to expand, then assign <strong>Owner</strong> and <strong>Impact</strong>.
+      Review the signal, then choose <strong>Right</strong> or <strong>Wrong</strong>.
     </div>
     """, unsafe_allow_html=True)
 
-    for i, pair in enumerate(gd.PAIRS):
-        color = gd.PAIN_COLORS[i]
-        label = gd.PAIN_LABELS[i]
-        sel_i = sels[i]
-        both = sel_i["owner"] is not None and sel_i["impact"] is not None
+    for display_idx, card in enumerate(cards):
+        color = gd.PAIN_COLORS[display_idx % len(gd.PAIN_COLORS)]
+        label = gd.PAIN_LABELS[display_idx]
+        sel_i = sels[card["orig_idx"]]
+        answered = sel_i["answer"] is not None
+        answer_text = "Right" if sel_i["answer"] is True else ("Wrong" if sel_i["answer"] is False else "-")
+        exp_lbl = f"[{'DONE' if answered else 'OPEN'}] {label} [{answer_text}]"
+        state_class = "question-state done" if answered else "question-state"
+        state_text = "Locked" if answered else "Awaiting Decision"
 
-        owner_text = next((o["text"] for o in owners if o["orig_idx"] == sel_i["owner"]), None)
-        impact_text = next((o["text"] for o in impacts if o["orig_idx"] == sel_i["impact"]), None)
-
-        o_tick = "OK" if owner_text else "-"
-        imp_tick = "OK" if impact_text else "-"
-        exp_lbl = f"[{'DONE' if both else 'OPEN'}] {label} [{o_tick} Owner {imp_tick} Impact]"
-        state_class = "question-state done" if both else "question-state"
-        state_text = "Ready" if both else "In Progress"
-
-        st.markdown(f'<div class="pain-wrap-{i}">', unsafe_allow_html=True)
-        with st.expander(exp_lbl, expanded=(i == st.session_state.active_pain)):
+        st.markdown(f'<div class="pain-wrap-{display_idx}">', unsafe_allow_html=True)
+        with st.expander(exp_lbl, expanded=(display_idx == st.session_state.active_pain)):
             st.markdown(f"""
             <div class="question-shell">
               <div class="question-kicker">
-                <div class="question-index">Pain {i + 1}</div>
+                <div class="question-index">Question {display_idx + 1}</div>
                 <div class="{state_class}">{state_text}</div>
               </div>
-              <div class="question-title">{pair['pain']}</div>
-              <div class="question-grid">
+              <div class="question-title">{card['pain']}</div>
+              <div class="question-grid" style="grid-template-columns:1fr;">
                 <div class="answer-panel">
-                  <div class="slot-label" style="color:{color}">WHO OWNS IT</div>
-                  <div class="answer-hint">Choose the team or stakeholder that should own solving this issue.</div>
-            """, unsafe_allow_html=True)
-
-            owner_indices = [None] + [
-                o["orig_idx"]
-                for o in owners
-                if o["orig_idx"] == sel_i["owner"]
-                or all(sels[j]["owner"] != o["orig_idx"] for j in range(gd.NUM_PAINS) if j != i)
-            ]
-
-            def _owner_option_label(idx: int | None) -> str:
-                if idx is None:
-                    return "Select owner"
-                option = next((o for o in owners if o["orig_idx"] == idx), None)
-                if option is None:
-                    return "Select owner"
-                return option["text"]
-
-            cur_owner_pos = next((k for k, idx in enumerate(owner_indices) if idx == sel_i["owner"]), 0)
-            new_owner_idx = st.selectbox(
-                "Owner",
-                owner_indices,
-                index=cur_owner_pos,
-                key=f"owner_{i}",
-                label_visibility="collapsed",
-                format_func=_owner_option_label,
-            )
-            if new_owner_idx != sel_i["owner"]:
-                st.session_state.selections[i]["owner"] = new_owner_idx
-                sel_after_owner = st.session_state.selections[i]
-                st.session_state.active_pain = (
-                    _next_incomplete_pain()
-                    if sel_after_owner["owner"] is not None and sel_after_owner["impact"] is not None
-                    else i
-                )
-                _mobile_haptic()
-                st.rerun()
-            if owner_text:
-                st.markdown(
-                    f'<div class="slot-filled" style="background:{color}10;border:1px solid {color}60;border-left:3px solid {color}"><strong>Selected owner</strong>{owner_text}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            st.markdown(f"""
+                  <div class="slot-label" style="color:{color}">IMPACT</div>
+                  <div class="slot-filled" style="background:{color}10;border:1px solid {color}60;border-left:3px solid {color}"><strong>Impact</strong>{card['impact']}</div>
                 </div>
-                <div class="answer-panel">
-                  <div class="slot-label" style="color:{color}">BUSINESS IMPACT</div>
-                  <div class="answer-hint">Pick the commercial or operational outcome this pain point creates.</div>
-            """, unsafe_allow_html=True)
-            impact_indices = [None] + [
-                imp["orig_idx"]
-                for imp in impacts
-                if imp["orig_idx"] == sel_i["impact"]
-                or all(sels[j]["impact"] != imp["orig_idx"] for j in range(gd.NUM_PAINS) if j != i)
-            ]
-
-            def _impact_option_label(idx: int | None) -> str:
-                if idx is None:
-                    return "Select impact"
-                option = next((imp for imp in impacts if imp["orig_idx"] == idx), None)
-                if option is None:
-                    return "Select impact"
-                return option["text"]
-
-            cur_impact_pos = next((k for k, idx in enumerate(impact_indices) if idx == sel_i["impact"]), 0)
-            new_impact_idx = st.selectbox(
-                "Impact",
-                impact_indices,
-                index=cur_impact_pos,
-                key=f"impact_{i}",
-                label_visibility="collapsed",
-                format_func=_impact_option_label,
-            )
-            if new_impact_idx != sel_i["impact"]:
-                st.session_state.selections[i]["impact"] = new_impact_idx
-                sel_after_impact = st.session_state.selections[i]
-                st.session_state.active_pain = (
-                    _next_incomplete_pain()
-                    if sel_after_impact["owner"] is not None and sel_after_impact["impact"] is not None
-                    else i
-                )
-                _mobile_haptic()
-                st.rerun()
-            if impact_text:
-                st.markdown(
-                    f'<div class="slot-filled" style="background:{color}10;border:1px solid {color}60;border-left:3px solid {color}"><strong>Selected impact</strong>{impact_text}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            st.markdown("""
+                <div class="answer-panel" style="margin-top:12px">
+                  <div class="slot-label" style="color:{color}">OWNER</div>
+                  <div class="slot-filled" style="background:{color}10;border:1px solid {color}60;border-left:3px solid {color}"><strong>Owner</strong>{card['owner']}</div>
                 </div>
               </div>
             </div>
             """, unsafe_allow_html=True)
 
+            st.markdown('<div class="decision-strip">', unsafe_allow_html=True)
+            if st.button(
+                "✓",
+                key=f"right_{display_idx}",
+                use_container_width=True,
+                type="primary" if sel_i["answer"] is True else "secondary",
+            ):
+                _update_answer(display_idx, True)
+            if st.button(
+                "✕",
+                key=f"wrong_{display_idx}",
+                use_container_width=True,
+                type="primary" if sel_i["answer"] is False else "secondary",
+            ):
+                _update_answer(display_idx, False)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            if sel_i["answer"] is not None:
+                choice_label = "Right" if sel_i["answer"] else "Wrong"
+                st.markdown(
+                    f'<div class="slot-filled" style="margin-top:12px;background:{color}10;border:1px solid {color}60;border-left:3px solid {color}"><strong>Your answer</strong>{choice_label}</div>',
+                    unsafe_allow_html=True,
+                )
+
         st.markdown('</div>', unsafe_allow_html=True)
 
-    filled = sum(1 for s in sels.values() if s["owner"] is not None and s["impact"] is not None)
+    filled = sum(1 for s in sels.values() if s["answer"] is not None)
     remaining = gd.NUM_PAINS - filled
-    btn_label = "Check My Answers" if remaining == 0 else "Complete all 5 matches"
+    btn_label = "Check My Answers" if remaining == 0 else f"Complete all {gd.NUM_PAINS} matches"
     st.markdown("""
     <div style="margin-top:10px;padding-top:12px;
          border-top:1px solid var(--border)">
@@ -1497,8 +1587,8 @@ def screen_game():
         if st.button(btn_label, use_container_width=True, type="primary", key="fab_submit", help="Submit once you are happy with your matches."):
             _do_submit(timed_out=False)
     else:
-        st.button(btn_label, use_container_width=True, type="primary", key="fab_submit_dis", disabled=True, help="Select owner and impact for all 5 pain points to submit.")
-        st.caption(f"Complete {remaining} more pain point {'match' if remaining == 1 else 'matches'} to unlock submit.")
+        st.button(btn_label, use_container_width=True, type="primary", key="fab_submit_dis", disabled=True, help="Answer every card to submit.")
+        st.caption(f"Complete {remaining} more card {'decision' if remaining == 1 else 'decisions'} to unlock submit.")
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -1506,7 +1596,8 @@ def screen_game():
 #  SUBMIT
 # ─────────────────────────────────────────────────────────────
 def _do_submit(timed_out: bool = False):
-    elapsed   = time.time() - (st.session_state.game_start_time or time.time())
+    start_time = st.session_state.game_start_time or time.time()
+    elapsed   = time.time() - start_time
     time_used = min(int(elapsed), gd.GAME_DURATION)
     sels      = st.session_state.selections
     score     = ge.calculate_score(sels)
@@ -1545,14 +1636,13 @@ def screen_results():
     sels      = st.session_state.selections
     tier      = ge.get_result_tier(score)
     breakdown = ge.build_breakdown(sels)
-    elapsed   = time.time() - (st.session_state.game_start_time or time.time())
+    start_time = st.session_state.game_start_time or time.time()
+    elapsed   = time.time() - start_time
     time_used = min(int(elapsed), gd.GAME_DURATION)
 
     st.markdown('<div class="results-shell">', unsafe_allow_html=True)
     # Pure-CSS score ring (no Plotly, instant on mobile)
-    pct_deg = int((score / gd.NUM_PAINS) * 360)
     pct_css = f"{int((score / gd.NUM_PAINS) * 100)}%"
-    tier_emoji = tier["emoji"]
     st.markdown(f"""
     <div class="results-panel">
       <div class="score-ring-wrap">
@@ -1578,16 +1668,15 @@ def screen_results():
     # Richer 2-per-row breakdown
     colors  = gd.PAIN_COLORS
     labels  = gd.PAIN_LABELS
-    pairs_d = gd.PAIRS
     rows_html = ""
     for row_start in range(0, gd.NUM_PAINS, 2):
         cells = ""
         for i in range(row_start, min(row_start + 2, gd.NUM_PAINS)):
-            bd    = breakdown[i]
-            col   = colors[i]
-            ic    = "✅" if bd["both_correct"] else "❌"
-            ow_ic = "✓" if bd["owner_correct"]  else "✗"
-            im_ic = "✓" if bd["impact_correct"] else "✗"
+            bd = breakdown[i]
+            col = colors[i]
+            ic = "✅" if bd["both_correct"] else "❌"
+            answer_label = "Right" if bd["answer"] is True else ("Wrong" if bd["answer"] is False else "No answer")
+            expected_label = "Right" if bd["expected"] else "Wrong"
             cells += f"""
             <div class="result-breakdown-card" style="border-top-color:{col};">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
@@ -1596,14 +1685,14 @@ def screen_results():
                 <span style="font-size:18px">{ic}</span>
               </div>
               <div style="font-size:11px;color:var(--text);font-weight:600;margin-bottom:6px;
-                   line-height:1.3">{pairs_d[i]['pain']}</div>
-              <div style="font-size:10px;color:var(--muted)">
-                <span style="color:{'#059669' if bd['owner_correct'] else '#DC2626'}">{ow_ic}</span> Owner&nbsp;
-                <span style="color:{'#059669' if bd['impact_correct'] else '#DC2626'}">{im_ic}</span> Impact
+                   line-height:1.3">{bd['pain_text']}</div>
+              <div style="font-size:10px;color:var(--muted);line-height:1.45">
+                You said: <span style="color:{'#059669' if bd['both_correct'] else '#DC2626'}">{answer_label}</span><br>
+                Correct call: <span style="color:#77c4a5">{expected_label}</span>
               </div>
             </div>"""
         rows_html += f'<div class="result-breakdown-row">{cells}</div>'
-    # If odd number, last card is full-width (5th pain)
+    # If odd number, last card is full-width
     st.markdown(f'<div class="results-panel">{rows_html}</div>', unsafe_allow_html=True)
 
     if score == gd.NUM_PAINS:
@@ -1622,6 +1711,22 @@ def screen_results():
     )
     st.markdown('</div>', unsafe_allow_html=True)
 
+    mascot_path = APP_DIR / "static" / "mascot_cool_cutout.png"
+    mascot_src = _image_data_uri(str(mascot_path)) if mascot_path.exists() else ""
+    if mascot_src:
+        st.markdown(
+            f"""
+            <div class="final-step-card">
+              <img class="final-step-mascot" src="{mascot_src}" alt="Cloudeva mascot">
+              <div class="final-step-copy">
+                <div class="final-step-kicker">Final Step</div>
+                <div class="final-step-text">Register for your free preview to complete the challenge</div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
     st.markdown(
         """
         <a class="cta-link" href="https://app.cloudeva.ai/auth/register" target="_blank" rel="noopener noreferrer">
@@ -1631,14 +1736,8 @@ def screen_results():
         unsafe_allow_html=True,
     )
 
-    c_a, c_b = st.columns(2)
-    with c_a:
-        if st.button("🔁  Play Again", use_container_width=True, key="res_again"):
-            _reset_for_play_again()
-            go("register")
-    with c_b:
-        if st.button("🏆  Leaderboard", use_container_width=True, key="res_lb"):
-            go("leaderboard")
+    if st.button("🏆  Leaderboard", use_container_width=True, key="res_lb"):
+        go("leaderboard")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1699,7 +1798,7 @@ def screen_leaderboard():
                 <div class="lb-co" title="{row['company']}">{row['company']}</div>
               </div>
               <div>
-                <div class="lb-sc">{row['score']}/5</div>
+                <div class="lb-sc">{row['score']}/{gd.NUM_PAINS}</div>
                 <div class="lb-time">{time_str}</div>
               </div>
             </div>
@@ -1744,6 +1843,31 @@ def screen_leaderboard():
             unsafe_allow_html=True,
         )
 
+    mascot_path = APP_DIR / "static" / "mascot_cool_cutout.png"
+    mascot_src = _image_data_uri(str(mascot_path)) if mascot_path.exists() else ""
+    if mascot_src:
+        st.markdown(
+            f"""
+            <div class="final-step-card" style="margin-top:20px;margin-bottom:16px">
+              <img class="final-step-mascot" src="{mascot_src}" alt="Cloudeva mascot">
+              <div class="final-step-copy">
+                <div class="final-step-kicker">Experience EVA</div>
+                <div class="final-step-text">Unlock full cloud intelligence with your free preview</div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.markdown(
+        """
+        <a class="cta-link" href="https://app.cloudeva.ai/auth/register" target="_blank" rel="noopener noreferrer">
+          Start Free Preview →
+        </a>
+        """,
+        unsafe_allow_html=True,
+    )
+
     c_a, c_b = st.columns(2)
     with c_a:
         if st.button("← Back", use_container_width=True, key="lb_back"):
@@ -1757,7 +1881,7 @@ def screen_leaderboard():
 #  HELPERS
 # ─────────────────────────────────────────────────────────────
 def _reset_for_play_again():
-    for k in ["player", "shuffled_owners", "shuffled_impacts", "selections", "active_pain",
+    for k in ["player", "game_cards", "selections", "active_pain",
               "game_start_time", "time_left", "submitted", "score", "session_id"]:
         st.session_state.pop(k, None)
     _init_state()

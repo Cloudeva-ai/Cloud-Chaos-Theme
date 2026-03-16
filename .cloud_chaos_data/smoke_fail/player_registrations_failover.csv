@@ -1,0 +1,2 @@
+recorded_at,name,company,email,db_status,error
+2026-03-16T10:07:28.264452+00:00,Fallback User,Fallback Co,fallback@example.com,failed,database is locked
