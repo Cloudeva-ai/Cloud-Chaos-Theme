@@ -1,0 +1,2 @@
+recorded_at,name,company,email,db_status,error
+2026-03-16T10:32:39.950310+00:00,Failover Test,Cloudeva,failover@example.com,failed,simulated database failure
