@@ -80,6 +80,21 @@ def _resolve_data_dir() -> Path:
 DATA_DIR = _resolve_data_dir()
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
+
+def _resolve_database_url() -> str | None:
+    raw_url = os.getenv("DATABASE_URL", "").strip()
+    if not raw_url:
+        return None
+    if raw_url.startswith("postgres://"):
+        return f"postgresql+psycopg://{raw_url[len('postgres://'):]}"
+    if raw_url.startswith("postgresql://"):
+        return f"postgresql+psycopg://{raw_url[len('postgresql://'):]}"
+    return raw_url
+
+
+DATABASE_URL = _resolve_database_url()
+USING_SQLITE = DATABASE_URL is None
+
 LEGACY_DB_PATH = APP_DIR / "cloud_chaos.db"
 LEGACY_DB_WAL_PATH = APP_DIR / "cloud_chaos.db-wal"
 LEGACY_DB_SHM_PATH = APP_DIR / "cloud_chaos.db-shm"
@@ -108,6 +123,9 @@ SELECTIONS_BACKUP_CSV_PATH = DATA_DIR / "game_selections_backup.csv"
 
 def _repair_database() -> None:
     """Attempt to repair corrupted database files."""
+    if not USING_SQLITE:
+        return
+
     # Remove WAL files if they exist (can cause I/O issues)
     wal_path = DB_PATH.with_suffix(f"{DB_PATH.suffix}-wal")
     shm_path = DB_PATH.with_suffix(f"{DB_PATH.suffix}-shm")
@@ -143,6 +161,9 @@ def _copy_if_missing(source: Path, target: Path) -> None:
 
 
 def _migrate_legacy_files() -> None:
+    if not USING_SQLITE:
+        return
+
     if DATA_DIR == APP_DIR:
         return
 
@@ -162,14 +183,17 @@ _migrate_legacy_files()
 _repair_database()
 
 ENGINE  = create_engine(
-    f"sqlite:///{DB_PATH}",
-    connect_args={"check_same_thread": False, "timeout": 60},
+    DATABASE_URL or f"sqlite:///{DB_PATH}",
+    connect_args={"check_same_thread": False, "timeout": 60} if USING_SQLITE else {},
     echo=False,
+    pool_pre_ping=True,
 )
 
 # Enable WAL mode and foreign keys on every new connection
 @event.listens_for(ENGINE, "connect")
 def _set_sqlite_pragmas(dbapi_connection, _connection_record):
+    if not USING_SQLITE:
+        return
     cursor = dbapi_connection.cursor()
     try:
         cursor.execute("PRAGMA journal_mode=DELETE;")  # Use DELETE instead of WAL to avoid I/O issues

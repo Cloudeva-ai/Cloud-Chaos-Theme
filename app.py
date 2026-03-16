@@ -28,6 +28,14 @@ except Exception:
 if secret_data_dir and not os.getenv("CLOUD_CHAOS_DATA_DIR"):
     os.environ["CLOUD_CHAOS_DATA_DIR"] = str(secret_data_dir)
 
+try:
+    secret_database_url = st.secrets.get("DATABASE_URL")
+except Exception:
+    secret_database_url = None
+
+if secret_database_url and not os.getenv("DATABASE_URL"):
+    os.environ["DATABASE_URL"] = str(secret_database_url)
+
 import database as db
 import game_data as gd
 import game_engine as ge

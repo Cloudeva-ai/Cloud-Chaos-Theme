@@ -20,3 +20,15 @@ This keeps local development simple and prevents write failures on Streamlit
 Cloud. If you need stable persistence across restarts on Streamlit Cloud, point
 `CLOUD_CHAOS_DATA_DIR` to a persistent mounted location or move the app to an
 external database/storage setup.
+
+## Cloud persistence
+
+For durable registrations on Streamlit Cloud, set `DATABASE_URL` in app secrets
+to an external database such as Postgres. The app will use `DATABASE_URL` when
+present and fall back to local SQLite only when it is missing.
+
+Example `.streamlit/secrets.toml`:
+
+```toml
+DATABASE_URL = "postgresql://USER:PASSWORD@HOST:5432/DBNAME"
+```
