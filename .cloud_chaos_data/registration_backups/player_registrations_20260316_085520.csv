@@ -1,5 +1,0 @@
-id,name,company,email,created_at,last_seen,total_plays,best_score,best_time
-1,Shahid Nazeer Syed,Shahid Nazeer,shahidnazeerwork@gmail.com,2026-03-16 08:36:22.803864,2026-03-16 08:47:44.062206,1,4,33.0
-2,Syed,Nazeer,syed.nazeer@rapyder.com,2026-03-16 08:47:03.551220,2026-03-16 08:47:03.551226,0,0,
-3,Test User,Test Company,test@example.com,2026-03-16 08:54:19.048985,2026-03-16 08:54:19.049003,0,0,
-4,Cloud User,Cloud Co,cloud-user@example.com,2026-03-16 08:55:20.184828,2026-03-16 08:55:20.184833,0,0,
