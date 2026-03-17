@@ -1372,11 +1372,12 @@ def _video_markup(path: Path, *, height_px: int = 140) -> str:
             f"justify-content:center;color:var(--muted)'>Smartwatch</div>"
         )
     video_src = _video_data_uri(str(path))
+    video_type = "video/quicktime" if path.suffix.lower() == ".mov" else "video/mp4"
     return (
         f'<video autoplay muted loop playsinline preload="auto" '
         f'disablepictureinpicture controlslist="nodownload nofullscreen noremoteplayback" '
         f'style="width:100%;height:{height_px}px;object-fit:cover;display:block;background:radial-gradient(circle at 50% 30%, #ffffff, #dbeafe 40%, #0f172a 100%);">'
-        f'<source src="{video_src}" type="video/quicktime">'
+        f'<source src="{video_src}" type="{video_type}">'
         f"</video>"
     )
 
@@ -1582,7 +1583,7 @@ def screen_register():
     </div>
     """, unsafe_allow_html=True)
 
-    watch_video_path = APP_DIR / "static" / "Smartwatch 3d.mov"
+    watch_video_path = APP_DIR / "static" / "smartwatch-loop.mp4"
     watch_media_html = _video_markup(watch_video_path, height_px=150)
 
     st.markdown(f"""
@@ -2008,7 +2009,7 @@ def screen_results():
               <img class="final-step-mascot" src="{mascot_src}" alt="Cloudeva mascot">
               <div class="final-step-copy">
                 <div class="final-step-kicker">Final Step</div>
-                <div class="final-step-text highlight"><strong>register below to complete the challenge</strong></div>
+                <div class="final-step-text highlight"><strong>register now<br>to complete the challenge</strong></div>
               </div>
             </div>
             """,
