@@ -411,23 +411,11 @@ div[data-testid="stForm"] {
 }
 .prize-top-label { font-size: 11px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: #77c4a5; margin-bottom: 12px; }
 .prize-card {
-  transform: translate3d(0, 0, 0);
-  transform-origin: center center;
-  animation: prizeDrift 6s ease-in-out infinite;
-  transition: transform .28s ease, box-shadow .28s ease, border-color .28s ease;
-  will-change: transform;
+  box-shadow: 0 10px 24px rgba(2,60,87,0.10);
 }
-.prize-card:nth-child(2) { animation-delay: .45s; }
-.prize-card:hover {
-  transform: translate3d(0, -6px, 0) scale(1.015);
-  box-shadow: 0 16px 30px rgba(2,60,87,0.16);
-  border-color: rgba(6,194,172,0.30) !important;
-}
-.prize-card:active { transform: translate3d(0, -2px, 0) scale(.995); }
 .prize-media {
   position: relative;
   overflow: hidden;
-  transform: translateZ(0);
   border-radius: 12px 12px 0 0;
   background:
     radial-gradient(circle at 50% 24%, rgba(255,255,255,0.92), rgba(186,230,253,0.92) 34%, rgba(8,47,73,0.96) 100%);
@@ -442,22 +430,10 @@ div[data-testid="stForm"] {
   pointer-events: none;
 }
 .prize-media img {
-  animation: prizeZoom 7.5s ease-in-out infinite;
-  transition: transform .4s ease, filter .4s ease;
-  will-change: transform;
+  display: block;
 }
 .prize-media video {
-  animation: prizeZoom 7.5s ease-in-out infinite;
-  transition: transform .4s ease, filter .4s ease;
-  will-change: transform;
-  mix-blend-mode: screen;
-}
-.prize-card:nth-child(2) .prize-media img { animation-delay: .6s; }
-.prize-card:nth-child(2) .prize-media video { animation-delay: .6s; }
-.prize-card:hover .prize-media img,
-.prize-card:hover .prize-media video {
-  transform: scale(1.04);
-  filter: saturate(1.04) contrast(1.02);
+  display: block;
 }
 
 @media (max-width: 640px) {
@@ -1583,7 +1559,7 @@ def screen_register():
     </div>
     """, unsafe_allow_html=True)
 
-    watch_video_path = APP_DIR / "static" / "smartwatch-loop.mp4"
+    watch_video_path = APP_DIR / "static" / "Smartwatch 3d.mp4"
     watch_media_html = _video_markup(watch_video_path, height_px=150)
 
     st.markdown(f"""
