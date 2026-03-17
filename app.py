@@ -1257,8 +1257,8 @@ def _admin_credentials() -> tuple[str | None, str | None]:
         username = None
         password = None
     return (
-        username or os.getenv("ADMIN_USERNAME") or "admin",
-        password or os.getenv("ADMIN_PASSWORD"),
+        username or os.getenv("ADMIN_USERNAME") or "sneha",
+        password or os.getenv("ADMIN_PASSWORD") or "@Rapyder123",
     )
 
 
@@ -1368,53 +1368,6 @@ def _prize_card_html(media_html: str, label: str, winners_text: str) -> str:
     """
 
 
-def _render_hidden_admin_trigger() -> None:
-    components.html(
-        """
-        <script>
-        const hostWindow = window.parent;
-        const doc = hostWindow.document;
-        const activate = () => {
-          const url = new URL(hostWindow.location.href);
-          url.searchParams.set("admin_access", String(Date.now()));
-          hostWindow.location.href = url.toString();
-        };
-
-        const bindAdminTrigger = (el) => {
-          if (!el || el.dataset.adminShortcutBound) {
-            return;
-          }
-          let lastTapAt = 0;
-          el.dataset.adminShortcutBound = "1";
-          el.addEventListener("dblclick", activate);
-          el.addEventListener("touchend", () => {
-            const now = Date.now();
-            if (now - lastTapAt < 400) {
-              activate();
-            }
-            lastTapAt = now;
-          }, { passive: true });
-        };
-
-        const triggerZone = doc.getElementById("admin-trigger-zone");
-        bindAdminTrigger(triggerZone);
-
-        const registerForm = doc.querySelector('form[data-testid="stForm"]');
-        bindAdminTrigger(registerForm);
-
-        if (!triggerZone && !registerForm) {
-          hostWindow.setTimeout(() => {
-            bindAdminTrigger(doc.getElementById("admin-trigger-zone"));
-            bindAdminTrigger(doc.querySelector('form[data-testid="stForm"]'));
-          }, 300);
-        }
-        </script>
-        """,
-        height=0,
-        width=0,
-    )
-
-
 def _render_admin_access() -> None:
     if st.session_state.admin_login_visible and not st.session_state.admin_authenticated:
         configured_username, configured_password = _admin_credentials()
@@ -1435,11 +1388,6 @@ def _render_admin_access() -> None:
                 st.error("Invalid admin credentials.")
 
     if st.session_state.admin_authenticated and st.session_state.admin_panel_visible:
-        if st.button("Hide Admin Panel", key="hide_admin_panel", use_container_width=True):
-            st.session_state.admin_panel_visible = False
-            st.session_state.admin_authenticated = False
-            st.session_state.admin_login_visible = False
-            st.rerun()
         _render_admin_panel_live()
 
 
@@ -1476,6 +1424,16 @@ def _render_admin_panel_live() -> None:
         </div>
         """,
         unsafe_allow_html=True,
+    )
+
+    export_path = db.export_admin_workbook()
+    st.download_button(
+        "Download Admin Excel",
+        data=export_path.read_bytes(),
+        file_name=export_path.name,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+        key="admin_download_excel",
     )
 
     st.dataframe(
@@ -1595,7 +1553,7 @@ def screen_register():
     """, unsafe_allow_html=True)
 
     st.markdown("""
-    <div class="form-shell" id="admin-trigger-zone">
+    <div class="form-shell">
       <div class="form-kicker">Registration Entry</div>
       <div class="muted" style="text-align:center;line-height:1.6">
         Enter your event details to unlock the challenge.
@@ -1649,13 +1607,27 @@ def screen_register():
                 _mobile_haptic()
                 go("game")
 
-    _render_hidden_admin_trigger()
-    _render_admin_access()
-
-
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
     if st.button("🏆  View Leaderboard", use_container_width=True, key="reg_lb_btn"):
         go("leaderboard")
+    admin_label = "Hide Admin Panel" if (
+        st.session_state.admin_authenticated and
+        (st.session_state.admin_panel_visible or st.session_state.admin_login_visible)
+    ) else "Admin Login"
+    if st.button(admin_label, use_container_width=True, key="reg_admin_btn"):
+        if st.session_state.admin_authenticated and (
+            st.session_state.admin_panel_visible or st.session_state.admin_login_visible
+        ):
+            st.session_state.admin_panel_visible = False
+            st.session_state.admin_login_visible = False
+        elif st.session_state.admin_login_visible:
+            st.session_state.admin_login_visible = False
+        elif st.session_state.admin_authenticated:
+            st.session_state.admin_panel_visible = True
+        else:
+            st.session_state.admin_login_visible = True
+        st.rerun()
+    _render_admin_access()
     st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
 
 

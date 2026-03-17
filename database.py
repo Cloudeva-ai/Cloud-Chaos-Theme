@@ -105,6 +105,7 @@ GAME_SESSIONS_BACKUP_PATH = DATA_DIR / "game_sessions_backup.xlsx"
 GAME_SESSIONS_BACKUP_CSV_PATH = DATA_DIR / "game_sessions_backup.csv"
 SELECTIONS_BACKUP_PATH = DATA_DIR / "game_selections_backup.xlsx"
 SELECTIONS_BACKUP_CSV_PATH = DATA_DIR / "game_selections_backup.csv"
+ADMIN_EXPORT_PATH = DATA_DIR / "cloud_chaos_admin_export.xlsx"
 
 
 def _repair_database() -> None:
@@ -1322,3 +1323,33 @@ def get_perfect_score_players() -> list[dict[str, Any]]:
 def get_registration_backup_path() -> Path:
     """Return the current Excel backup path for registration data."""
     return REGISTRATION_BACKUP_PATH
+
+
+def export_admin_workbook() -> Path:
+    """
+    Write a persistent admin workbook with current registrations, sessions,
+    and aggregate stats. The file lives in DATA_DIR so it survives app reruns.
+    """
+    registrations_df = pd.DataFrame(get_admin_panel_data())
+    try:
+        sessions_df = pd.DataFrame(get_full_leaderboard(limit=1_000_000))
+    except Exception:
+        sessions_df = _load_backup_session_rows()
+    stats = get_stats()
+    stats_df = pd.DataFrame([{
+        "total_players": stats.get("total_players", 0),
+        "total_sessions": stats.get("total_sessions", 0),
+        "perfect_count": stats.get("perfect_count", 0),
+        "avg_score": stats.get("avg_score", 0.0),
+    }])
+    pain_accuracy_df = pd.DataFrame(stats.get("pain_accuracy", []))
+
+    temp_path = ADMIN_EXPORT_PATH.with_suffix(".tmp.xlsx")
+    with BACKUP_LOCK:
+        with pd.ExcelWriter(temp_path, engine="openpyxl") as writer:
+            registrations_df.to_excel(writer, index=False, sheet_name="registrations")
+            sessions_df.to_excel(writer, index=False, sheet_name="sessions")
+            stats_df.to_excel(writer, index=False, sheet_name="summary")
+            pain_accuracy_df.to_excel(writer, index=False, sheet_name="pain_accuracy")
+        os.replace(temp_path, ADMIN_EXPORT_PATH)
+    return ADMIN_EXPORT_PATH
