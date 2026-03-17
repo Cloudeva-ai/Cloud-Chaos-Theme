@@ -677,14 +677,14 @@ div[data-testid="stForm"] {
   margin-bottom: 5px;
 }
 .final-step-text {
-  font-size: 14px;
+  font-size: 17px;
   line-height: 1.5;
   color: var(--text);
   font-weight: 700;
 }
 .final-step-text.highlight {
   display: inline-block;
-  padding: 6px 10px;
+  padding: 8px 12px;
   border-radius: 10px;
   background: linear-gradient(135deg, rgba(6,194,172,0.28), rgba(255,255,255,0.18));
   border: 1px solid rgba(255,255,255,0.24);
@@ -1374,16 +1374,39 @@ def _render_hidden_admin_trigger() -> None:
         <script>
         const hostWindow = window.parent;
         const doc = hostWindow.document;
-        const triggerZone = doc.getElementById("admin-trigger-zone");
-        if (triggerZone && !triggerZone.dataset.adminDoubleclickBound) {
-          const activate = () => {
-            const url = new URL(hostWindow.location.href);
-            url.searchParams.set("admin_access", String(Date.now()));
-            hostWindow.location.href = url.toString();
-          };
+        const activate = () => {
+          const url = new URL(hostWindow.location.href);
+          url.searchParams.set("admin_access", String(Date.now()));
+          hostWindow.location.href = url.toString();
+        };
 
-          triggerZone.dataset.adminDoubleclickBound = "1";
-          triggerZone.addEventListener("dblclick", activate);
+        const bindAdminTrigger = (el) => {
+          if (!el || el.dataset.adminShortcutBound) {
+            return;
+          }
+          let lastTapAt = 0;
+          el.dataset.adminShortcutBound = "1";
+          el.addEventListener("dblclick", activate);
+          el.addEventListener("touchend", () => {
+            const now = Date.now();
+            if (now - lastTapAt < 400) {
+              activate();
+            }
+            lastTapAt = now;
+          }, { passive: true });
+        };
+
+        const triggerZone = doc.getElementById("admin-trigger-zone");
+        bindAdminTrigger(triggerZone);
+
+        const registerForm = doc.querySelector('form[data-testid="stForm"]');
+        bindAdminTrigger(registerForm);
+
+        if (!triggerZone && !registerForm) {
+          hostWindow.setTimeout(() => {
+            bindAdminTrigger(doc.getElementById("admin-trigger-zone"));
+            bindAdminTrigger(doc.querySelector('form[data-testid="stForm"]'));
+          }, 300);
         }
         </script>
         """,
