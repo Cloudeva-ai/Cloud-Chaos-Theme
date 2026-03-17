@@ -35,8 +35,6 @@ import game_engine as ge
 
 APP_DIR = Path(__file__).parent
 LOGO_PATH = APP_DIR / "Logo" / "CloudEva_Logo_transparent.png"
-LAPTOP_IMAGE_PATH = APP_DIR / "static" / "laptop.jpeg"
-WATCH_IMAGE_PATH = APP_DIR / "static" / "smartwatch.jpeg"
 PRIZE_CARD_STYLE = (
     "flex:1;background:rgba(255,255,255,0.92);border:1px solid rgba(15,23,42,.08);"
     "border-radius:12px;overflow:hidden;display:flex;flex-direction:column;align-items:center;"
@@ -427,16 +425,37 @@ div[data-testid="stForm"] {
 }
 .prize-card:active { transform: translate3d(0, -2px, 0) scale(.995); }
 .prize-media {
+  position: relative;
   overflow: hidden;
   transform: translateZ(0);
+  border-radius: 12px 12px 0 0;
+  background:
+    radial-gradient(circle at 50% 24%, rgba(255,255,255,0.92), rgba(186,230,253,0.92) 34%, rgba(8,47,73,0.96) 100%);
+}
+.prize-media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.24), transparent 26%),
+    radial-gradient(circle at 50% 108%, rgba(6,194,172,0.20), transparent 34%);
+  pointer-events: none;
 }
 .prize-media img {
   animation: prizeZoom 7.5s ease-in-out infinite;
   transition: transform .4s ease, filter .4s ease;
   will-change: transform;
 }
+.prize-media video {
+  animation: prizeZoom 7.5s ease-in-out infinite;
+  transition: transform .4s ease, filter .4s ease;
+  will-change: transform;
+  mix-blend-mode: screen;
+}
 .prize-card:nth-child(2) .prize-media img { animation-delay: .6s; }
-.prize-card:hover .prize-media img {
+.prize-card:nth-child(2) .prize-media video { animation-delay: .6s; }
+.prize-card:hover .prize-media img,
+.prize-card:hover .prize-media video {
   transform: scale(1.04);
   filter: saturate(1.04) contrast(1.02);
 }
@@ -686,6 +705,15 @@ div[data-testid="stForm"] {
   line-height: 1.5;
   color: var(--text);
   font-weight: 700;
+}
+.final-step-text.highlight {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(6,194,172,0.28), rgba(255,255,255,0.18));
+  border: 1px solid rgba(255,255,255,0.24);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.22);
+  font-weight: 800;
 }
 
 /* ── Result title / sub ── */
@@ -1314,6 +1342,15 @@ def _image_data_uri(path: str) -> str:
     return f"data:image/{suffix};base64,{encoded}"
 
 
+@st.cache_data
+def _video_data_uri(path: str) -> str:
+    video_path = Path(path)
+    suffix = video_path.suffix.lower()
+    mime = "video/quicktime" if suffix == ".mov" else f"video/{suffix.lstrip('.') or 'mp4'}"
+    encoded = base64.b64encode(video_path.read_bytes()).decode("ascii")
+    return f"data:{mime};base64,{encoded}"
+
+
 def _image_markup(path: Path, alt: str, *, height_px: int = 140) -> str:
     if not path.exists():
         fallback = alt.replace(" prize", "")
@@ -1325,6 +1362,22 @@ def _image_markup(path: Path, alt: str, *, height_px: int = 140) -> str:
     return (
         f'<img src="{image_src}" alt="{alt}" '
         f'style="width:100%;height:{height_px}px;object-fit:cover;display:block;background:#fff;">'
+    )
+
+
+def _video_markup(path: Path, *, height_px: int = 140) -> str:
+    if not path.exists():
+        return (
+            f"<div style='height:{height_px}px;display:flex;align-items:center;"
+            f"justify-content:center;color:var(--muted)'>Smartwatch</div>"
+        )
+    video_src = _video_data_uri(str(path))
+    return (
+        f'<video autoplay muted loop playsinline preload="auto" '
+        f'disablepictureinpicture controlslist="nodownload nofullscreen noremoteplayback" '
+        f'style="width:100%;height:{height_px}px;object-fit:cover;display:block;background:radial-gradient(circle at 50% 30%, #ffffff, #dbeafe 40%, #0f172a 100%);">'
+        f'<source src="{video_src}" type="video/quicktime">'
+        f"</video>"
     )
 
 
@@ -1344,31 +1397,16 @@ def _render_hidden_admin_trigger() -> None:
         <script>
         const hostWindow = window.parent;
         const doc = hostWindow.document;
-        const triggerZone = doc.getElementById("admin-longpress-zone");
-        if (triggerZone && !triggerZone.dataset.adminLongpressBound) {
-          let timer = null;
+        const triggerZone = doc.getElementById("admin-trigger-zone");
+        if (triggerZone && !triggerZone.dataset.adminDoubleclickBound) {
           const activate = () => {
             const url = new URL(hostWindow.location.href);
             url.searchParams.set("admin_access", String(Date.now()));
             hostWindow.location.href = url.toString();
           };
-          const startPress = () => {
-            timer = hostWindow.setTimeout(activate, 1200);
-          };
-          const cancelPress = () => {
-            if (timer) {
-              hostWindow.clearTimeout(timer);
-              timer = null;
-            }
-          };
 
-          triggerZone.dataset.adminLongpressBound = "1";
-          triggerZone.addEventListener("touchstart", startPress, { passive: true });
-          triggerZone.addEventListener("touchend", cancelPress);
-          triggerZone.addEventListener("touchcancel", cancelPress);
-          triggerZone.addEventListener("mousedown", startPress);
-          triggerZone.addEventListener("mouseup", cancelPress);
-          triggerZone.addEventListener("mouseleave", cancelPress);
+          triggerZone.dataset.adminDoubleclickBound = "1";
+          triggerZone.addEventListener("dblclick", activate);
         }
         </script>
         """,
@@ -1499,31 +1537,6 @@ def _render_leaderboard_live() -> None:
     </div>
     """, unsafe_allow_html=True)
 
-    if stats["pain_accuracy"]:
-        bar_rows = ""
-        for idx, row in enumerate(stats["pain_accuracy"]):
-            pct = row["accuracy_pct"] or 0
-            color = gd.PAIN_COLORS[idx % len(gd.PAIN_COLORS)]
-            bar_rows += (
-                f'<div style="margin-bottom:10px;text-align:left">'
-                f'<div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px;color:var(--muted)">'
-                f'<span>Pain #{row["pain_idx"] + 1}</span>'
-                f'<span>{pct}%</span>'
-                f"</div>"
-                f'<div style="height:8px;background:rgba(2,60,87,0.10);border-radius:999px;overflow:hidden">'
-                f'<div style="width:{pct}%;height:100%;background:{color};border-radius:999px"></div>'
-                f"</div>"
-                f"</div>"
-            )
-        st.markdown(
-            (
-                '<div class="cc-card">'
-                '<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;text-align:center">Pain Point Accuracy</div>'
-                f"{bar_rows}"
-                "</div>"
-            ),
-            unsafe_allow_html=True,
-        )
 
 
 
@@ -1569,21 +1582,20 @@ def screen_register():
     </div>
     """, unsafe_allow_html=True)
 
-    laptop_media_html = _image_markup(LAPTOP_IMAGE_PATH, "Laptop prize")
-    watch_media_html = _image_markup(WATCH_IMAGE_PATH, "Smartwatch prize")
+    watch_video_path = APP_DIR / "static" / "Smartwatch 3d.mov"
+    watch_media_html = _video_markup(watch_video_path, height_px=150)
 
     st.markdown(f"""
     <div class="prize-banner">
       <div class="prize-top-label">Prize Pool</div>
       <div style="display:flex;gap:8px;margin-bottom:6px">
-        {_prize_card_html(laptop_media_html, "Laptop", "1 winner")}
         {_prize_card_html(watch_media_html, "Smartwatch", "3 winners")}
       </div>
     </div>
     """, unsafe_allow_html=True)
 
     st.markdown("""
-    <div class="form-shell" id="admin-longpress-zone">
+    <div class="form-shell" id="admin-trigger-zone">
       <div class="form-kicker">Registration Entry</div>
       <div class="muted" style="text-align:center;line-height:1.6">
         Enter your event details to unlock the challenge.
@@ -1996,7 +2008,7 @@ def screen_results():
               <img class="final-step-mascot" src="{mascot_src}" alt="Cloudeva mascot">
               <div class="final-step-copy">
                 <div class="final-step-kicker">Final Step</div>
-                <div class="final-step-text">Register for your free preview to complete the challenge</div>
+                <div class="final-step-text highlight"><strong>register below to complete the challenge</strong></div>
               </div>
             </div>
             """,
@@ -2008,7 +2020,7 @@ def screen_results():
         <a class="cta-link" href="https://app.cloudeva.ai/auth/register" target="_blank" rel="noopener noreferrer">
           <span class="cta-copy">
             <span class="cta-text primary">Start Free Preview →</span>
-            <span class="cta-text alt">Win Laptop/SmartWatch →</span>
+            <span class="cta-text alt">Win Smartwatch →</span>
           </span>
         </a>
         """,
@@ -2067,7 +2079,7 @@ def screen_leaderboard():
         <a class="cta-link" href="https://app.cloudeva.ai/auth/register" target="_blank" rel="noopener noreferrer">
           <span class="cta-copy">
             <span class="cta-text primary">Start Free Preview →</span>
-            <span class="cta-text alt">Win Laptop/SmartWatch →</span>
+            <span class="cta-text alt">Win Smartwatch →</span>
           </span>
         </a>
         """,
